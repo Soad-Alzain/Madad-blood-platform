@@ -1,0 +1,54 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "email": "test@example.com",
+      "password": "123"
+    }
+  ],
+  "login": [
+    {
+      "token": "fake-jwt-token-123456",
+      "message": "Login successful",
+      "id": "OvuSje84ZQU"
+    },
+    {
+      "customer_id": 1,
+      "product_id": 10,
+      "quantity": 0,
+      "id": "HyYxpi5USDM"
+    },
+    {
+      "customer_id": 1,
+      "product_id": 10,
+      "quantity": 0,
+      "id": "Kppzt7ycNvw"
+    },
+    {
+      "email": "soadhamdanqueen@gmail.com",
+      "password": "14844654",
+      "id": "uor6-jiPMvE"
+    },
+    {
+      "email": "soadhamdanqueen@gmail.com",
+      "password": "14844654",
+      "id": "YhiU5VXNMOc"
+    },
+    {
+      "email": "soadhamdanqueen@gmail.com",
+      "password": "14844654",
+      "id": "ObN16mAa9mw"
+    },
+    {
+      "email": "soadhamdanqueen@gmail.com",
+      "password": "5654ef+45g+4rg+",
+      "id": "2UkZnEsOJ8w"
+    },
+    {
+      "email": "soadhamdanqueen@gmail.com",
+      "password": "hgkkjkkj",
+      "id": "-GsXQaIsa9Q"
+    }
+  ],
+  "$schema": "./node_modules/json-server/schema.json"
+}
