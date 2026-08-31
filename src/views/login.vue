@@ -122,6 +122,7 @@ const login = async () => {
   padding: 2rem 1rem;
   display: flex;
   justify-content: center;
+  background-color: #fff;
 }
 
 .signup-container {

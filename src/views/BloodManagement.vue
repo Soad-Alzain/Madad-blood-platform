@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file BloodManagement.vue
- * @description Component for managing blood banks, inventory, and hospital requests with Odoo integration.
+ * @description Fully responsive component with table-to-card transformation for small screens.
  */
 
 import { ref, computed, onMounted } from 'vue'
@@ -100,37 +100,26 @@ const requests = ref<BloodRequest[]>([
 // 5. ODOO JSON-RPC INTEGRATION HANDLER
 // ==========================================
 
-/**
- * Connect to Odoo RPC API and fetch blood bank records
- */
 const fetchOdooData = async () => {
   isLoading.value = true
   odooError.value = null
 
   try {
-    // الخطوة الأولى: المصادقة للحصول على معرف المستخدم (uid)
     const authResponse = await axios.post('/jsonrpc', {
       jsonrpc: '2.0',
       method: 'call',
       params: {
         service: 'common',
         method: 'authenticate',
-        args: [
-          'YOUR_DB_NAME',         // اسم قاعدة بيانات أودو
-          'user@example.com',     // اسم المستخدم أو البريد الإلكتروني
-          'YOUR_PASSWORD',        // كلمة المرور أو مفتاح الـ API
-          {}
-        ]
+        args: ['YOUR_DB_NAME', 'user@example.com', 'YOUR_PASSWORD', {}]
       }
     })
 
     const uid = authResponse.data?.result
-
     if (!uid) {
       throw new Error('Odoo Authentication failed. Please verify your credentials.')
     }
 
-    // الخطوة الثانية: استدعاء البيانات من موديل أودو عبر execute_kw
     const response = await axios.post('/jsonrpc', {
       jsonrpc: '2.0',
       method: 'call',
@@ -141,12 +130,10 @@ const fetchOdooData = async () => {
           'YOUR_DB_NAME',
           uid,
           'YOUR_PASSWORD',
-          'medical.blood.bank', // اسم الموديل الخاص ببنوك الدم في أودو
+          'medical.blood.bank',
           'search_read',
-          [[]], // المجال (Domain) لجلب كافة السجلات
-          { 
-            fields: ['name', 'location', 'phone', 'stock_level', 'state', 'blood_type'] 
-          }
+          [[]],
+          { fields: ['name', 'location', 'phone', 'stock_level', 'state', 'blood_type'] }
         ]
       }
     })
@@ -156,7 +143,6 @@ const fetchOdooData = async () => {
     }
 
     if (response.data?.result) {
-      // ربط وتحديث مصفوفة بنوك الدم بالبيانات القادمة من أودو
       bloodBanks.value = response.data.result.map((item: any) => ({
         id: item.id,
         name: item.name,
@@ -176,7 +162,6 @@ const fetchOdooData = async () => {
 }
 
 onMounted(() => {
-  // قم بإلغاء التعليق عن الدالة أدناه عند تشغيل خادم أودو الفعلي
   // fetchOdooData()
 })
 
@@ -283,7 +268,7 @@ const getStatusClass = (status: string) => {
         :class="{ active: activeTab === 'banks' }" 
         @click="switchTab('banks')"
       >
-        <span class="icon">🏛️</span>
+        <span class="icon"><i class="fas fa-hospital"></i></span>
         <h3>Blood Banks</h3>
       </button>
 
@@ -292,7 +277,7 @@ const getStatusClass = (status: string) => {
         :class="{ active: activeTab === 'inventory' }" 
         @click="switchTab('inventory')"
       >
-        <span class="icon">📦</span>
+        <span class="icon"><i class="fas fa-boxes"></i></span>
         <h3>Inventory</h3>
       </button>
 
@@ -301,7 +286,7 @@ const getStatusClass = (status: string) => {
         :class="{ active: activeTab === 'requests' }" 
         @click="switchTab('requests')"
       >
-        <span class="icon">📋</span>
+        <span class="icon"><i class="fas fa-clipboard-list"></i></span>
         <h3>Blood Requests</h3>
       </button>
     </nav>
@@ -309,7 +294,7 @@ const getStatusClass = (status: string) => {
     <!-- Centered Larger Search Box -->
     <div class="search-container">
       <div class="search-box">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><i class="fas fa-search"></i></span>
         <input 
           v-model="searchQuery" 
           type="search" 
@@ -352,7 +337,7 @@ const getStatusClass = (status: string) => {
       </div>
 
       <div class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table responsive-table">
           <thead>
             <tr>
               <th>Blood Bank</th>
@@ -366,13 +351,13 @@ const getStatusClass = (status: string) => {
           </thead>
           <tbody>
             <tr v-for="bank in filteredBanks" :key="bank.id">
-              <td>{{ bank.name }}</td>
-              <td>{{ bank.location }}</td>
-              <td>{{ bank.contact }}</td>
-              <td><strong>{{ bank.bloodType }}</strong></td>
-              <td>{{ bank.stockLevel }}</td>
-              <td><span class="status-badge" :class="getStatusClass(bank.status)">{{ bank.status }}</span></td>
-              <td><button @click="viewBankDetails(bank)" class="btn-view">View</button></td>
+              <td data-label="Blood Bank">{{ bank.name }}</td>
+              <td data-label="Location">{{ bank.location }}</td>
+              <td data-label="Contact">{{ bank.contact }}</td>
+              <td data-label="Blood Type"><strong>{{ bank.bloodType }}</strong></td>
+              <td data-label="Stock Level">{{ bank.stockLevel }}</td>
+              <td data-label="Status"><span class="status-badge" :class="getStatusClass(bank.status)">{{ bank.status }}</span></td>
+              <td data-label="Actions"><button @click="viewBankDetails(bank)" class="btn-view">View</button></td>
             </tr>
             <tr v-if="filteredBanks.length === 0">
               <td colspan="7" class="no-data">No matching blood banks found.</td>
@@ -405,7 +390,7 @@ const getStatusClass = (status: string) => {
       </div>
 
       <div class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table responsive-table">
           <thead>
             <tr>
               <th>Blood Type</th>
@@ -418,16 +403,16 @@ const getStatusClass = (status: string) => {
           </thead>
           <tbody>
             <tr v-for="item in filteredInventory" :key="item.id">
-              <td><strong>{{ item.bloodType }}</strong></td>
-              <td>{{ item.available }}</td>
-              <td>{{ item.reserved }}</td>
-              <td>{{ item.expiryDate }}</td>
-              <td>
+              <td data-label="Blood Type"><strong>{{ item.bloodType }}</strong></td>
+              <td data-label="Available">{{ item.available }}</td>
+              <td data-label="Reserved">{{ item.reserved }}</td>
+              <td data-label="Expiry Date">{{ item.expiryDate }}</td>
+              <td data-label="Status">
                 <span class="status-badge" :class="getStatusClass(item.status)">
                   {{ item.status }}
                 </span>
               </td>
-              <td><button @click="viewInventoryDetails(item)" class="btn-view">View</button></td>
+              <td data-label="Movement"><button @click="viewInventoryDetails(item)" class="btn-view">View</button></td>
             </tr>
             <tr v-if="filteredInventory.length === 0">
               <td colspan="6" class="no-data">No matching inventory records found.</td>
@@ -465,7 +450,7 @@ const getStatusClass = (status: string) => {
       </div>
 
       <div class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table responsive-table">
           <thead>
             <tr>
               <th>Request ID</th>
@@ -479,17 +464,17 @@ const getStatusClass = (status: string) => {
           </thead>
           <tbody>
             <tr v-for="req in filteredRequests" :key="req.id">
-              <td>{{ req.id }}</td>
-              <td>{{ req.hospital }}</td>
-              <td><strong>{{ req.bloodType }}</strong></td>
-              <td>{{ req.units }}</td>
-              <td>{{ req.priority }}</td>
-              <td>
+              <td data-label="Request ID">{{ req.id }}</td>
+              <td data-label="Hospital">{{ req.hospital }}</td>
+              <td data-label="Blood Type"><strong>{{ req.bloodType }}</strong></td>
+              <td data-label="Units">{{ req.units }}</td>
+              <td data-label="Priority">{{ req.priority }}</td>
+              <td data-label="Status">
                 <span class="status-badge" :class="getStatusClass(req.status)">
                   {{ req.status }}
                 </span>
               </td>
-              <td><button @click="viewRequestDetails(req)" class="btn-view">View</button></td>
+              <td data-label="Actions"><button @click="viewRequestDetails(req)" class="btn-view">View</button></td>
             </tr>
             <tr v-if="filteredRequests.length === 0">
               <td colspan="7" class="no-data">No matching blood requests found.</td>
@@ -505,25 +490,25 @@ const getStatusClass = (status: string) => {
       <!-- Pop-up 1: Blood Bank View -->
       <div v-if="activeTab === 'banks' && selectedBankItem" class="popup-card">
         <div class="popup-icon-wrapper">
-          <div class="circle-icon">🏛️</div>
+          <div class="circle-icon"><i class="fas fa-hospital"></i></div>
         </div>
         <h3>{{ selectedBankItem.name }}</h3>
         <div class="popup-grid">
           <div class="popup-item">
-            <span class="p-icon">📍</span> <strong>Location:</strong> {{ selectedBankItem.location }}
+            <span class="p-icon"><i class="fas fa-map-marker-alt"></i></span> <strong>Location:</strong> {{ selectedBankItem.location }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">📞</span> <strong>Phone:</strong> {{ selectedBankItem.contact }}
+            <span class="p-icon"><i class="fas fa-phone-alt"></i></span> <strong>Phone:</strong> {{ selectedBankItem.contact }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">✔️</span> <strong>Status:</strong> {{ selectedBankItem.status }}
+            <span class="p-icon"><i class="fas fa-check-circle"></i></span> <strong>Status:</strong> {{ selectedBankItem.status }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">🩸</span> <strong>Total Blood Units:</strong> {{ selectedBankItem.totalUnits || 500 }} Units
+            <span class="p-icon"><i class="fas fa-tint"></i></span> <strong>Total Blood Units:</strong> {{ selectedBankItem.totalUnits || 500 }} Units
           </div>
         </div>
         <div class="popup-full-width">
-          <span class="p-icon">✔️</span> <strong>Available Blood Types:</strong> {{ selectedBankItem.availableTypes?.join(', ') || 'A-, O+, B+' }}
+          <span class="p-icon"><i class="fas fa-check-circle"></i></span> <strong>Available Blood Types:</strong> {{ selectedBankItem.availableTypes?.join(', ') || 'A-, O+, B+' }}
         </div>
         <button class="btn-close-modal" @click="closeModal">Close</button>
       </div>
@@ -531,28 +516,28 @@ const getStatusClass = (status: string) => {
       <!-- Pop-up 2: Unit Movement View -->
       <div v-if="activeTab === 'inventory' && selectedInventoryItem" class="popup-card">
         <div class="popup-icon-wrapper">
-          <div class="circle-icon borderless">🔄</div>
+          <div class="circle-icon borderless"><i class="fas fa-sync-alt"></i></div>
         </div>
         <h3 class="popup-title-red">Unit Movement</h3>
         
         <div class="movement-flow">
           <span>{{ selectedInventoryItem.fromBank || 'Central Blood Bank' }}</span>
-          <span class="arrow">➔➔➔</span>
+          <span class="arrow"><i class="fas fa-arrow-right"></i></span>
           <span>{{ selectedInventoryItem.toBank || 'Emergency Blood Bank' }}</span>
         </div>
 
         <div class="popup-grid">
           <div class="popup-item">
-            <span class="p-icon">🩸</span> <strong>Blood Type:</strong> {{ selectedInventoryItem.bloodType }}
+            <span class="p-icon"><i class="fas fa-tint"></i></span> <strong>Blood Type:</strong> {{ selectedInventoryItem.bloodType }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">📊</span> <strong>Available Units:</strong> {{ selectedInventoryItem.available }}
+            <span class="p-icon"><i class="fas fa-chart-bar"></i></span> <strong>Available Units:</strong> {{ selectedInventoryItem.available }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">📌</span> <strong>Reserved:</strong> {{ selectedInventoryItem.reserved }}
+            <span class="p-icon"><i class="fas fa-thumbtack"></i></span> <strong>Reserved:</strong> {{ selectedInventoryItem.reserved }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">⏳</span> <strong>Expiry Date:</strong> {{ selectedInventoryItem.expiryDate }}
+            <span class="p-icon"><i class="fas fa-hourglass-half"></i></span> <strong>Expiry Date:</strong> {{ selectedInventoryItem.expiryDate }}
           </div>
         </div>
         <button class="btn-close-modal" @click="closeModal">Close</button>
@@ -561,31 +546,31 @@ const getStatusClass = (status: string) => {
       <!-- Pop-up 3: Blood Request View -->
       <div v-if="activeTab === 'requests' && selectedRequestItem" class="popup-card">
         <div class="popup-icon-wrapper">
-          <div class="circle-icon">📋</div>
+          <div class="circle-icon"><i class="fas fa-clipboard-list"></i></div>
         </div>
         <h3>Request Details: {{ selectedRequestItem.id }}</h3>
         <div class="popup-grid">
           <div class="popup-item">
-            <span class="p-icon">🏥</span> <strong>Hospital:</strong> {{ selectedRequestItem.hospital }}
+            <span class="p-icon"><i class="fas fa-hospital-alt"></i></span> <strong>Hospital:</strong> {{ selectedRequestItem.hospital }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">🩸</span> <strong>Blood Type:</strong> {{ selectedRequestItem.bloodType }}
+            <span class="p-icon"><i class="fas fa-tint"></i></span> <strong>Blood Type:</strong> {{ selectedRequestItem.bloodType }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">📦</span> <strong>Units:</strong> {{ selectedRequestItem.units }}
+            <span class="p-icon"><i class="fas fa-boxes"></i></span> <strong>Units:</strong> {{ selectedRequestItem.units }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">⚡</span> <strong>Priority:</strong> {{ selectedRequestItem.priority }}
+            <span class="p-icon"><i class="fas fa-bolt"></i></span> <strong>Priority:</strong> {{ selectedRequestItem.priority }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">📍</span> <strong>Location:</strong> {{ selectedRequestItem.location }}
+            <span class="p-icon"><i class="fas fa-map-marker-alt"></i></span> <strong>Location:</strong> {{ selectedRequestItem.location }}
           </div>
           <div class="popup-item">
-            <span class="p-icon">🏷️</span> <strong>Status:</strong> {{ selectedRequestItem.status }}
+            <span class="p-icon"><i class="fas fa-tag"></i></span> <strong>Status:</strong> {{ selectedRequestItem.status }}
           </div>
         </div>
         <div v-if="selectedRequestItem.note" class="popup-full-width">
-          <span class="p-icon">📝</span> <strong>Note:</strong> {{ selectedRequestItem.note }}
+          <span class="p-icon"><i class="fas fa-comment-alt"></i></span> <strong>Note:</strong> {{ selectedRequestItem.note }}
         </div>
         <button class="btn-close-modal" @click="closeModal">Close</button>
       </div>
@@ -601,6 +586,8 @@ const getStatusClass = (status: string) => {
   margin: 0 auto;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #333;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .main-title {
@@ -640,6 +627,12 @@ const getStatusClass = (status: string) => {
   font-size: 1.5rem;
   display: block;
   margin-bottom: 6px;
+  color: #730b19;
+}
+
+.card.active .icon,
+.card:hover .icon {
+  color: #fff;
 }
 
 /* Center & Large Search Box */
@@ -679,6 +672,7 @@ const getStatusClass = (status: string) => {
   top: 50%;
   transform: translateY(-50%);
   font-size: 1.1rem;
+  color: #730b19;
 }
 
 /* Error Alert */
@@ -713,12 +707,14 @@ const getStatusClass = (status: string) => {
   display: flex;
   justify-content: flex-start;
   margin-bottom: 20px;
+  width: 100%;
 }
 
 .filter-buttons {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .filter-select {
@@ -729,12 +725,13 @@ const getStatusClass = (status: string) => {
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
-  min-width: 140px;
+  flex: 1;
+  min-width: 130px;
 }
 
-/* Data Table */
+/* Data Table Desktop */
 .table-wrapper {
-  overflow-x: auto;
+  width: 100%;
 }
 
 .data-table {
@@ -742,6 +739,8 @@ const getStatusClass = (status: string) => {
   border-collapse: collapse;
   border: 1px solid #730b19;
   background-color: #fff;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .data-table th {
@@ -762,6 +761,7 @@ const getStatusClass = (status: string) => {
   padding: 24px;
   color: #777;
   font-style: italic;
+  text-align: center;
 }
 
 .btn-view {
@@ -770,12 +770,14 @@ const getStatusClass = (status: string) => {
   font-weight: bold;
   cursor: pointer;
   color: #730b19;
+  padding: 4px 8px;
 }
 
 .status-badge {
   font-weight: 600;
   padding: 4px 8px;
   border-radius: 4px;
+  display: inline-block;
 }
 
 .status-active { color: #2e7d32; }
@@ -794,17 +796,22 @@ const getStatusClass = (status: string) => {
   justify-content: center;
   align-items: center;
   z-index: 999;
+  padding: 15px;
+  box-sizing: border-box;
 }
 
 .popup-card {
   background: #fff;
   border: 3px solid #730b19;
   border-radius: 20px;
-  padding: 30px;
-  width: 90%;
+  padding: 25px;
+  width: 100%;
   max-width: 500px;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .popup-icon-wrapper {
@@ -823,6 +830,11 @@ const getStatusClass = (status: string) => {
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
+}
+
+.p-icon {
+  color: #730b19;
+  margin-right: 4px;
 }
 
 .popup-grid {
@@ -854,6 +866,7 @@ const getStatusClass = (status: string) => {
   color: #333;
   margin-bottom: 20px;
   font-size: 0.95rem;
+  flex-wrap: wrap;
 }
 
 .arrow {
@@ -865,8 +878,106 @@ const getStatusClass = (status: string) => {
   background-color: #730b19;
   color: #fff;
   border: none;
-  padding: 8px 24px;
+  padding: 10px 24px;
   border-radius: 8px;
   cursor: pointer;
+  font-weight: bold;
+}
+
+/* ==========================================
+   RESPONSIVE DESIGN: TABLE-TO-CARD FOR MOBILE
+   ========================================== */
+
+@media (max-width: 768px) {
+  .blood-management-page {
+    padding: 15px 10px;
+  }
+
+  .main-title {
+    font-size: 1.5rem;
+  }
+
+  .category-cards {
+    gap: 10px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 110px;
+    padding: 10px 5px;
+  }
+
+  .card h3 {
+    font-size: 0.8rem;
+  }
+
+  .filter-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .filter-select {
+    width: 100%;
+  }
+
+  .responsive-table, 
+  .responsive-table thead, 
+  .responsive-table tbody, 
+  .responsive-table th, 
+  .responsive-table td, 
+  .responsive-table tr {
+    display: block;
+  }
+
+  .responsive-table thead {
+    display: none; 
+  }
+
+  .responsive-table tr {
+    background: #fff;
+    border: 2px solid #730b19;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    padding: 15px;
+    box-shadow: 0 4px 10px rgba(115, 11, 25, 0.05);
+  }
+
+  .responsive-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: right;
+    padding: 8px 0;
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.9rem;
+  }
+
+  .responsive-table td:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+    justify-content: center;
+    margin-top: 10px;
+    border-top: 1px dashed #ddd;
+    padding-top: 10px;
+  }
+
+  .responsive-table td::before {
+    content: attr(data-label);
+    font-weight: bold;
+    color: #730b19;
+    text-align: left;
+    margin-right: 15px;
+  }
+
+  .popup-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    text-align: center;
+  }
+
+  .popup-card {
+    padding: 20px 15px;
+  }
 }
 </style>

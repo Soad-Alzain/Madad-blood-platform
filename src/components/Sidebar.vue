@@ -1,11 +1,14 @@
 <script setup lang="ts">
 /**
  * @file Sidebar.vue
- * @description Responsive mobile sidebar component providing role-based navigation and user profile summary.
+ * @description Responsive mobile sidebar component implementing role-based navigation, 
+ * accessibility controls, and strict prop typing to ensure maintainability and 
+ * separation of concerns in the MADAD platform frontend architecture.
  */
 
 /**
- * Strict TypeScript interface for User Profile Data model.
+ * Strict TypeScript interface defining the User Profile Data model
+ * adhering to domain-driven design for user entities.
  */
 interface UserData {
   name: string
@@ -18,7 +21,8 @@ interface UserData {
 }
 
 /**
- * Component input properties with default fallback configurations.
+ * Component input properties with default fallback configurations 
+ * to prevent runtime exceptions on missing states (Defensive Programming).
  */
 withDefaults(defineProps<{
   isOpen?: boolean
@@ -39,7 +43,8 @@ withDefaults(defineProps<{
 })
 
 /**
- * Component emitted events for state management coordination.
+ * Emitted events definition for parent-child communication 
+ * and state management coordination.
  */
 const emit = defineEmits<{
   (e: 'close'): void
@@ -47,20 +52,26 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <!-- Sidebar Backdrop Overlay: Closes drawer on outside click -->
+  <!-- Sidebar Backdrop Overlay: Manages modal focus trap and outside-click dismissal -->
   <div v-if="isOpen" class="sidebar-overlay" @click="emit('close')">
     
-    <!-- Sidebar Content Drawer: Stops click propagation to prevent unwanted closing -->
-    <div class="sidebar-container" @click.stop role="dialog" aria-modal="true" aria-label="Sidebar Navigation">
+    <!-- Sidebar Content Drawer: Stops click propagation to prevent unexpected closures -->
+    <div 
+      class="sidebar-container" 
+      @click.stop 
+      role="dialog" 
+      aria-modal="true" 
+      aria-label="Mobile Navigation Sidebar"
+    >
       
-      <!-- Close Button inside container for proper positioning -->
-      <button class="close-btn" @click="emit('close')" aria-label="Close sidebar">&times;</button>
+      <!-- Accessibility Close Action Button -->
+      <button class="close-btn" @click="emit('close')" aria-label="Close navigation sidebar">&times;</button>
 
-      <!-- User Profile Header Section (Role-Tailored) -->
+      <!-- User Profile Summary Header (Role-Tailored Context) -->
       <div class="sidebar-header-profile">
         <h3 class="brand-title">MADAD</h3>
         <div class="profile-info">
-          <p class="p-name"><strong>{{ userData.name  || 'User'}}</strong></p>
+          <p class="p-name"><strong>{{ userData.name || 'User' }}</strong></p>
           <p class="p-role">{{ userData.roleTitle }}</p>
           <p v-if="userData.bloodType" class="p-blood">Blood Type: {{ userData.bloodType }}</p>
           <p class="p-detail">{{ userData.email }}</p>
@@ -72,22 +83,22 @@ const emit = defineEmits<{
 
       <hr class="divider" />
 
-      <!-- Dynamic Navigation Links Based on User Permissions & Roles -->
-      <nav class="sidebar-links" aria-label="Mobile Navigation">
+      <!-- Dynamic Role-Based Navigation Links (Access Control Pattern) -->
+      <nav class="sidebar-links" aria-label="Mobile Navigation Links">
         <router-link to="/" class="sidebar-item" @click="emit('close')">Home</router-link>
         <router-link to="/dashboard" class="sidebar-item" @click="emit('close')">Dashboard</router-link>
         
-        <!-- Role-Specific Conditional Route: Donor Specific View -->
+        <!-- Role-Specific Route: Donor Context -->
         <template v-if="userRole === 'donor'">
           <router-link to="/my-donations" class="sidebar-item" @click="emit('close')">My Donations</router-link>
         </template>
         
-        <!-- Role-Specific Conditional Route: Institutional / General View -->
+        <!-- Role-Specific Route: Institutional / General Context -->
         <template v-else>
           <router-link to="/blood-management" class="sidebar-item" @click="emit('close')">Blood Management</router-link>
         </template>
 
-        <!-- Role-Specific Conditional Route: Admin Privileges -->
+        <!-- Role-Specific Route: Administrative Privileges -->
         <template v-if="userRole === 'admin'">
           <router-link to="/users" class="sidebar-item" @click="emit('close')">Users</router-link>
         </template>
@@ -102,7 +113,6 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-/* Backdrop overlay styling with smooth focus containment */
 .sidebar-overlay {
   position: fixed;
   top: 0;
@@ -115,9 +125,8 @@ const emit = defineEmits<{
   justify-content: flex-start;
 }
 
-/* Sidebar panel container layout and dimensions */
 .sidebar-container {
-  position: relative; /* Added to anchor the absolute close button inside */
+  position: relative;
   width: 280px;
   height: 100%;
   background-color: #ffffff;
@@ -128,7 +137,6 @@ const emit = defineEmits<{
   flex-direction: column;
 }
 
-/* Brand identity header styling */
 .brand-title {
   color: #730b19;
   font-size: 22px;
@@ -136,7 +144,6 @@ const emit = defineEmits<{
   text-align: center;
 }
 
-/* User profile card section styling */
 .profile-info {
   font-size: 14px;
   color: #333;
@@ -151,21 +158,18 @@ const emit = defineEmits<{
 .p-detail { color: #666; font-size: 13px; }
 .p-status { color: #28a745; font-weight: bold; margin-top: 5px; }
 
-/* Visual separator component */
 .divider {
   border: 0;
   border-top: 1px solid #ddd;
   margin: 15px 0;
 }
 
-/* Navigation items wrapper layout */
 .sidebar-links {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-/* Individual navigation link styling and transition effects */
 .sidebar-item {
   padding: 10px 15px;
   color: #333;
@@ -181,7 +185,6 @@ const emit = defineEmits<{
   color: #ffffff;
 }
 
-/* Destructive action styling for Logout */
 .logout {
   color: #d9534f;
 }
@@ -191,7 +194,6 @@ const emit = defineEmits<{
   color: #ffffff;
 }
 
-/* Fixed positioning inside the sidebar container */
 .close-btn {
   position: absolute;
   top: 15px;

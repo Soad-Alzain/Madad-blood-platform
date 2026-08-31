@@ -1,7 +1,18 @@
 <script setup lang="ts">
+/**
+ * @file Navbar.vue
+ * @description Desktop and Responsive Header Component featuring dynamic role-based 
+ * route configurations, dropdown navigation patterns, and centralized event handling 
+ * for mobile drawer toggling.
+ */
+
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
+/**
+ * Component input properties definition with type validation 
+ * and robust default fallback structures.
+ */
 const props = defineProps({
   userRole: {
     type: String,
@@ -16,12 +27,21 @@ const props = defineProps({
 defineEmits(['toggle-sidebar'])
 const router = useRouter()
 
+// Reactive state tracking active dropdown menus to support clean UI interaction
 const activeDropdown = ref<string | null>(null)
 
+/**
+ * Toggles dropdown display state based on menu key identifiers.
+ * @param {string} menu - The unique key of the selected dropdown menu.
+ */
 const toggleDropdown = (menu: string) => {
   activeDropdown.value = activeDropdown.value === menu ? null : menu
 }
 
+/**
+ * Computed property implementing Role-Based Access Control (RBAC) navigation matrix.
+ * Filters visible routes dynamically depending on the authenticated user role.
+ */
 const navLinks = computed(() => {
   switch (props.userRole) {
     case 'admin':
@@ -85,15 +105,19 @@ const navLinks = computed(() => {
 <template>
   <header class="navbar-header">
     <div class="navbar-container">
-      <button class="mobile-menu-btn" @click="$emit('toggle-sidebar')">
+      
+      <!-- Mobile Drawer Toggle Trigger -->
+      <button class="mobile-menu-btn" @click="$emit('toggle-sidebar')" aria-label="Open mobile menu">
         ☰
       </button>
 
+      <!-- Brand Logo Navigation Link -->
       <router-link to="/" class="logo-link">
         <img src="/src/assets/MADAD Logo.png" alt="MADAD - مَدَد" class="logo-img" />
       </router-link>
 
-      <nav class="nav-links">
+      <!-- Desktop Dynamic Navigation Bar -->
+      <nav class="nav-links" aria-label="Desktop Navigation">
         <template v-for="(link, index) in navLinks" :key="index">
           <div v-if="link.hasDropdown" class="dropdown-container" @click="toggleDropdown(link.key)">
             <span class="nav-item dropdown-toggle">{{ link.name }} ▾</span>
@@ -107,6 +131,7 @@ const navLinks = computed(() => {
         </template>
       </nav>
 
+      <!-- Authentication State Control Actions -->
       <div class="navbar-right">
         <template v-if="userRole === 'guest'">
           <div class="log-re-btn">
@@ -134,7 +159,7 @@ const navLinks = computed(() => {
 }
 
 .navbar-container {
-  width: 90%;
+  width: 57%;
   max-width: 1200px;
   height: 65px;
   border: 2px solid #730b19;
@@ -143,8 +168,9 @@ const navLinks = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  padding-right: 10px;
   position: relative;
+  direction: ltr;
 }
 
 .mobile-menu-btn {
@@ -164,10 +190,9 @@ const navLinks = computed(() => {
 }
 
 .logo-img {
-  height: 45px;
+  height: 74px;
   max-width: 120px;
-  object-fit: contain;
-  border-radius: 10px;
+  border-radius: 25px 0 0 25px;
 }
 
 .nav-links {
@@ -262,11 +287,11 @@ const navLinks = computed(() => {
   .navbar-container {
     width: 100%;
     padding: 0 15px;
-    border:none;
+    border: none;
     justify-content: space-between;
   }
-  .mobile-menu-btn{
-    margin: 100px;
+  .mobile-menu-btn {
+    margin: 10px;
   }
 }
 </style>

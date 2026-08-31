@@ -46,7 +46,7 @@ const currentUserData = ref({
 body {
   margin: 0;
   font-family: 'Cairo', sans-serif;
-  background-color: #f8f9fa;
+  background-color: #fff;
 }
 
 .main-content {
