@@ -10,6 +10,7 @@ import DonateBlood from '@/components/Donate Blood.vue'
 import MyDonationsView from '@/components/MyDonationsView.vue'
 import Reports from '@/views/ReportsView.vue'
 import Ntifications from '@/views/Ntifications.vue'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -18,16 +19,13 @@ const router = createRouter({
     { path: '/blood-management', name: 'blood-management', component: BloodManagement },
     { path: '/users', name: 'users', component: Users },
     { path: '/my-donations', name: 'my-donations', component: BloodManagement }, 
-    { path: '/reports', name: 'reports', component: Dashboard },
+    { path: '/reports', name: 'reports', component: Reports },
     { path: '/notifications', name: 'notifications', component: Ntifications },
     { path: '/profile', name: 'profile', component: Profile },
     { path: '/login', name: 'login', component: Login },
-    {path:  '/request-blood', name:'request-blood',component:BloodRequest},
-    {path:  '/donate-blood', name:'donate-blood',component:DonateBlood},
-    {path:  '/donation-view', name:"donation-view",component:MyDonationsView},
-    {path:  '/reports', name:'reports',component:Reports},
-    
-
+    { path: '/request-blood', name: 'request-blood', component: BloodRequest },
+    { path: '/donate-blood', name: 'donate-blood', component: DonateBlood },
+    { path: '/donation-view', name: 'donation-view', component: MyDonationsView },
   ]
 })
 
