@@ -1,16 +1,20 @@
 <script setup>
 /**
  * @file ReportsView.vue
- * @description Centralized reporting view that dynamically renders metrics and lists 
- * based on the authorization role with Font Awesome icons and PDF export.
+ * @description Centralized reporting view that dynamically fetches metrics and lists 
+ * based on the authorization role from Odoo backend APIs with full error and loading handling.
  */
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { bloodRequestService } from '@/services/bloodRequestService';
+import { inventoryService } from '@/services/inventoryService';
+import { hospitalService } from '@/services/hospitalService';
+import { appointmentService } from '@/services/appointmentService';
 
 const props = defineProps({
   userRole: {
     type: String,
     required: false,
-    default: 'Donor'
+    default: 'donor'
   }
 });
 
@@ -20,35 +24,56 @@ const sanitizedRole = computed(() => {
   return props.userRole.toLowerCase().trim();
 });
 
-// Mock Data for different roles matching Odoo specifications
+// Reactive states for dynamic data, loading, and errors
+const loading = ref(true);
+const errorMessage = ref('');
+
 const reportData = ref({
-  bloodRequests: [
-    { request_id: "REQ-01", hospital: "Al-Amal Hospital", blood_type: "O+", quantity: 3, status: "Pending" }
-  ],
-  donations: [
-    { id: 1, date: "2026-08-15", bloodType: "O+", bloodBank: "Central Bank", quantity: 1, status: "Completed" }
-  ],
-  bloodBanks: [
-    { id: 1, name: "Central Blood Bank", location: "Khartoum", stockLevel: "High" }
-  ],
-  donors: [
-    { id: 1, name: "Soad Hamdan", bloodType: "O+", phone: "0912345678" }
-  ],
-  inventory: [
-    { bloodType: "O+", units: 45 },
-    { bloodType: "A+", units: 30 },
-    { bloodType: "B+", units: 15 }
-  ],
-  approved: [
-    { request_id: "REQ-02", hospital: "City Hospital", blood_type: "A+", quantity: 2, status: "Approved" }
-  ],
-  pending: [
-    { request_id: "REQ-03", hospital: "Teaching Hospital", blood_type: "B-", quantity: 1, status: "Pending" }
-  ],
-  completed: [
-    { request_id: "REQ-04", hospital: "Children Hospital", blood_type: "O-", quantity: 4, status: "Completed" }
-  ],
-  unitsDonated: 4
+  bloodRequests: [],
+  donations: [],
+  bloodBanks: [],
+  donors: [],
+  inventory: [],
+  approved: [],
+  pending: [],
+  completed: [],
+  unitsDonated: 0
+});
+
+/**
+ * Fetches dynamic report data from Odoo backend based on the user role.
+ */
+const fetchReportData = async () => {
+  loading.value = true;
+  errorMessage.value = '';
+  
+  try {
+    // Fetch requests and appointments based on available Odoo APIs
+    const [requestsRes, inventoryRes, appointmentsRes] = await Promise.all([
+      bloodRequestService.getBloodRequests().catch(() => []),
+      inventoryService.getInventory().catch(() => []),
+      appointmentService.getAppointments().catch(() => [])
+    ]);
+
+    reportData.value.bloodRequests = requestsRes || [];
+    reportData.value.inventory = inventoryRes || [];
+    reportData.value.donations = appointmentsRes || [];
+    
+    // Filtering states for requests if applicable
+    reportData.value.approved = reportData.value.bloodRequests.filter(r => r.status?.toLowerCase() === 'approved');
+    reportData.value.pending = reportData.value.bloodRequests.filter(r => r.status?.toLowerCase() === 'pending');
+    reportData.value.completed = reportData.value.bloodRequests.filter(r => r.status?.toLowerCase() === 'completed');
+
+  } catch (error) {
+    console.error('Error fetching reports data:', error);
+    errorMessage.value = 'Unable to load data. Please try again.';
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchReportData();
 });
 
 /**
@@ -77,29 +102,41 @@ const downloadPDF = () => {
         <p class="role-indicator">Viewing as: <span class="role-highlight">{{ userRole }}</span></p>
       </header>
 
-      <div class="reports-content-wrapper" role="region">
+      <!-- Loading State -->
+      <div v-if="loading" class="status-message">
+        Loading reports...
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="errorMessage" class="status-message error">
+        {{ errorMessage }}
+      </div>
+
+      <!-- Content Wrapper -->
+      <div v-else class="reports-content-wrapper" role="region">
         
         <!-- Admin Role Sections -->
         <template v-if="sanitizedRole === 'admin'">
           <section class="report-block">
             <h2 class="block-title"><i class="fas fa-hand-holding-medical icon-title"></i> Blood Requests</h2>
-            <div class="card-content">{{ reportData.bloodRequests.length }} Active Requests</div>
+            <div class="card-content">
+              <span v-if="reportData.bloodRequests.length">{{ reportData.bloodRequests.length }} Active Requests</span>
+              <span v-else class="empty-text">No blood requests found.</span>
+            </div>
           </section>
           <section class="report-block">
             <h2 class="block-title"><i class="fas fa-heartbeat icon-title"></i> Donations</h2>
-            <div class="card-content">{{ reportData.donations.length }} Total Donations</div>
-          </section>
-          <section class="report-block">
-            <h2 class="block-title"><i class="fas fa-hospital icon-title"></i> Blood Banks</h2>
-            <div class="card-content">{{ reportData.bloodBanks.length }} Registered Banks</div>
-          </section>
-          <section class="report-block">
-            <h2 class="block-title"><i class="fas fa-users icon-title"></i> Donors</h2>
-            <div class="card-content">{{ reportData.donors.length }} Active Donors</div>
+            <div class="card-content">
+              <span v-if="reportData.donations.length">{{ reportData.donations.length }} Total Donations</span>
+              <span v-else class="empty-text">No donations found.</span>
+            </div>
           </section>
           <section class="report-block">
             <h2 class="block-title"><i class="fas fa-boxes icon-title"></i> Inventory</h2>
-            <div class="card-content">View Global Stock Levels</div>
+            <div class="card-content">
+              <span v-if="reportData.inventory.length">View Global Stock Levels</span>
+              <span v-else class="empty-text">No inventory data found.</span>
+            </div>
           </section>
         </template>
 
@@ -115,7 +152,10 @@ const downloadPDF = () => {
           </section>
           <section class="report-block">
             <h2 class="block-title"><i class="fas fa-clipboard-list icon-title"></i> Requests</h2>
-            <div class="card-content">Handle Hospital Requests</div>
+            <div class="card-content">
+              <span v-if="reportData.bloodRequests.length">{{ reportData.bloodRequests.length }} Requests to Handle</span>
+              <span v-else class="empty-text">No blood requests found.</span>
+            </div>
           </section>
         </template>
 
@@ -123,7 +163,10 @@ const downloadPDF = () => {
         <template v-else-if="sanitizedRole === 'hospital'">
           <section class="report-block">
             <h2 class="block-title"><i class="fas fa-file-medical icon-title"></i> Requests</h2>
-            <div class="card-content">All Hospital Requests</div>
+            <div class="card-content">
+              <span v-if="reportData.bloodRequests.length">{{ reportData.bloodRequests.length }} Total Requests</span>
+              <span v-else class="empty-text">No blood requests found.</span>
+            </div>
           </section>
           <section class="report-block">
             <h2 class="block-title"><i class="fas fa-check-circle icon-title"></i> Approved</h2>
@@ -143,7 +186,10 @@ const downloadPDF = () => {
         <template v-else>
           <section class="report-block">
             <h2 class="block-title"><i class="fas fa-tint icon-title"></i> Donations</h2>
-            <div class="card-content">{{ reportData.donations.length }} Donations Logged</div>
+            <div class="card-content">
+              <span v-if="reportData.donations.length">{{ reportData.donations.length }} Donations Logged</span>
+              <span v-else class="empty-text">No donations found.</span>
+            </div>
           </section>
           <section class="report-block">
             <h2 class="block-title"><i class="fas fa-plus-circle icon-title"></i> Units Donated</h2>
@@ -260,6 +306,23 @@ const downloadPDF = () => {
   border-radius: 8px;
   border: 1px solid #ddd;
   font-weight: 600;
+}
+
+.status-message {
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #555;
+}
+
+.status-message.error {
+  color: #d9534f;
+}
+
+.empty-text {
+  color: #777;
+  font-style: italic;
 }
 
 /* Hide action buttons when printing to PDF */

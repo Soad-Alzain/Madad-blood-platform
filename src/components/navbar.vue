@@ -1,18 +1,7 @@
 <script setup lang="ts">
-/**
- * @file Navbar.vue
- * @description Desktop and Responsive Header Component featuring dynamic role-based 
- * route configurations, dropdown navigation patterns, and centralized event handling 
- * for mobile drawer toggling.
- */
-
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 
-/**
- * Component input properties definition with type validation 
- * and robust default fallback structures.
- */
 const props = defineProps({
   userRole: {
     type: String,
@@ -20,83 +9,105 @@ const props = defineProps({
   },
   userData: {
     type: Object,
-    default: () => ({ name: 'زائر', subtitle: 'guest@madad.com' })
+    default: () => ({ name: ' ', subtitle: 'guest@madad.com' })
   }
 })
 
 defineEmits(['toggle-sidebar'])
 const router = useRouter()
 
-// Reactive state tracking active dropdown menus to support clean UI interaction
 const activeDropdown = ref<string | null>(null)
 
-/**
- * Toggles dropdown display state based on menu key identifiers.
- * @param {string} menu - The unique key of the selected dropdown menu.
- */
-const toggleDropdown = (menu: string) => {
+const toggleDropdown = (menu: string, event: Event) => {
+  event.stopPropagation()
   activeDropdown.value = activeDropdown.value === menu ? null : menu
 }
 
-/**
- * Computed property implementing Role-Based Access Control (RBAC) navigation matrix.
- * Filters visible routes dynamically depending on the authenticated user role.
- */
+const closeDropdowns = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (!target.closest('.dropdown-container')) {
+    activeDropdown.value = null
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', closeDropdowns)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdowns)
+})
+
 const navLinks = computed(() => {
   switch (props.userRole) {
     case 'admin':
       return [
-        { name: 'Home', path: '/' },
-        { name: 'Dashboard', path: '/dashboard' },
-        { hasDropdown: true, name: 'Blood Management', key: 'blood', children: [
-            { name: 'Blood Banks', path: '/blood-management?tab=banks' },
-            { name: 'Inventory', path: '/blood-management?tab=inventory' },
-            { name: 'Blood Requests', path: '/blood-management?tab=requests' }
-          ]
+        { name: 'Home', path: '/', icon: 'fa-solid fa-house' },
+        { name: 'Blood Management', path: '/blood-management', icon: 'fa-solid fa-boxes-stacked' },
+        { 
+          hasDropdown: true, 
+          name: 'Users', 
+          key: 'users', 
+          icon: 'fa-solid fa-users-gear',
+          children: [
+            { name: 'Hospitals', path: '/users?tab=hospitals', icon: 'fa-solid fa-hospital' },
+            { name: 'Donors', path: '/users?tab=donors', icon: 'fa-solid fa-user-group' },
+            { name: 'Add Hospital', path: '/users?action=add-hospital', icon: 'fa-solid fa-hospital-user' },
+            { name: 'Add Donor', path: '/users?action=add-donor', icon: 'fa-solid fa-user-plus' }
+          ] 
         },
-        { hasDropdown: true, name: 'Users', key: 'users', children: [
-            { name: 'Hospitals', path: '/users?type=hospitals' },
-            { name: 'Donors', path: '/users?type=donors' }
-          ]
-        },
-        { name: 'Reports', path: '/reports' }
+        { name: 'Notifications', path: '/notifications', icon: 'fa-solid fa-bell' },
+        { name: 'Profile', path: '/profile', icon: 'fa-solid fa-user' }
       ]
     case 'hospital':
       return [
-        { name: 'Home', path: '/' },
-        { name: 'Dashboard', path: '/dashboard' },
-        { hasDropdown: true, name: 'Blood Management', key: 'blood', children: [
-            { name: 'Blood Search', path: '/blood-management?tab=search' },
-            { name: 'My Requests', path: '/blood-management?tab=my-requests' }
+        { name: 'Home', path: '/', icon: 'fa-solid fa-house' },
+        { 
+          hasDropdown: true, 
+          name: 'Blood Management', 
+          key: 'hospital_mgmt', 
+          icon: 'fa-solid fa-file-medical',
+          children: [
+            { name: 'My Blood Requests', path: '/blood-management?tab=requests', icon: 'fa-solid fa-list-check' },
+            { name: 'Create Blood Request', path: '/request-blood', icon: 'fa-solid fa-hand-holding-medical' }
           ]
         },
-        { name: 'Reports', path: '/reports' }
+        { name: 'Notifications', path: '/notifications', icon: 'fa-solid fa-bell' },
+        { name: 'Profile', path: '/profile', icon: 'fa-solid fa-user' }
       ]
     case 'blood_bank':
       return [
-        { name: 'Home', path: '/' },
-        { name: 'Dashboard', path: '/dashboard' },
-        { hasDropdown: true, name: 'Blood Management', key: 'blood', children: [
-            { name: 'Blood Banks', path: '/blood-management?tab=banks' },
-            { name: 'Inventory', path: '/blood-management?tab=inventory' },
-            { name: 'Blood Requests', path: '/blood-management?tab=requests' }
-          ]
+        { name: 'Home', path: '/', icon: 'fa-solid fa-house' },
+        { 
+          hasDropdown: true, 
+          name: 'Blood Management', 
+          key: 'blood_bank_mgmt', 
+          icon: 'fa-solid fa-warehouse',
+          children: [
+            { name: 'Inventory', path: '/blood-management?tab=inventory', icon: 'fa-solid fa-droplet' },
+            { name: 'Blood Requests', path: '/blood-management?tab=requests', icon: 'fa-solid fa-file-medical' },
+            { name: 'Donation Appointments', path: '/blood-management?tab=appointments', icon: 'fa-solid fa-calendar-check' }
+          ] 
         },
-        { name: 'Reports', path: '/reports' }
+        { name: 'Notifications', path: '/notifications', icon: 'fa-solid fa-bell' },
+        { name: 'Profile', path: '/profile', icon: 'fa-solid fa-user' }
       ]
     case 'donor':
       return [
-        { name: 'Home', path: '/' },
-        { name: 'Dashboard', path: '/dashboard' },
-        { name: 'My Donations', path: '/my-donations' },
-        { name: 'Reports', path: '/reports' }
+        { name: 'Home', path: '/', icon: 'fa-solid fa-house' },
+        { name: 'Blood Donation', path: '/donate-blood', icon: 'fa-solid fa-hand-holding-droplet' },
+        { name: 'My Appointments', path: '/appointments', icon: 'fa-solid fa-calendar-days' },
+        { name: 'My Donations', path: '/donation-view', icon: 'fa-solid fa-clock-rotate-left' },
+        { name: 'Notifications', path: '/notifications', icon: 'fa-solid fa-bell' },
+        { name: 'Profile', path: '/profile', icon: 'fa-solid fa-user' }
       ]
     default:
       return [
-        { name: 'Home', path: '/' },
-        { name: 'Dashboard', path: '/dashboard' },
-        { name: 'Blood Management', path: '/blood-management' },
-        { name: 'Users', path: '/users' }
+        { name: 'Home', path: '/', icon: 'fa-solid fa-house' },
+        { name: 'Blood Management', path: '/blood-management', icon: 'fa-solid fa-boxes-stacked' },
+        { name: 'Notifications', path: '/notifications', icon: 'fa-solid fa-bell' },
+        { name: 'Dashboard', path: '/dashboard', icon: 'fa-solid fa-chart-line' },
+        { name: 'LOGIN', path: '/login', icon: 'fa-solid fa-right-to-bracket' }
       ]
   }
 })
@@ -106,45 +117,49 @@ const navLinks = computed(() => {
   <header class="navbar-header">
     <div class="navbar-container">
       
-      <!-- Mobile Drawer Toggle Trigger -->
       <button class="mobile-menu-btn" @click="$emit('toggle-sidebar')" aria-label="Open mobile menu">
-        ☰
+        <i class="fa-solid fa-bars"></i>
       </button>
 
-      <!-- Brand Logo Navigation Link -->
       <router-link to="/" class="logo-link">
         <img src="/src/assets/MADAD Logo.png" alt="MADAD - مَدَد" class="logo-img" />
       </router-link>
 
-      <!-- Desktop Dynamic Navigation Bar -->
       <nav class="nav-links" aria-label="Desktop Navigation">
         <template v-for="(link, index) in navLinks" :key="index">
-          <div v-if="link.hasDropdown" class="dropdown-container" @click="toggleDropdown(link.key)">
-            <span class="nav-item dropdown-toggle">{{ link.name }} ▾</span>
+          <div v-if="link.hasDropdown" class="dropdown-container" @click="(e) => toggleDropdown(link.key, e)">
+            <span class="nav-item dropdown-toggle">
+              <i :class="link.icon" v-if="link.icon"></i>
+              <span>{{ link.name }}</span>
+              <i class="fa-solid fa-chevron-down dropdown-arrow"></i>
+            </span>
             <div v-if="activeDropdown === link.key" class="dropdown-menu">
-              <router-link v-for="(child, cIndex) in link.children" :key="cIndex" :to="child.path" class="dropdown-item">
-                {{ child.name }}
+              <router-link 
+                v-for="(child, cIndex) in link.children" 
+                :key="cIndex" 
+                :to="child.path" 
+                class="dropdown-item"
+                @click="activeDropdown = null"
+              >
+                <i :class="child.icon" v-if="child.icon"></i> {{ child.name }}
               </router-link>
             </div>
           </div>
-          <router-link v-else class="nav-item" :to="link.path">{{ link.name }}</router-link>
+          <router-link v-else :to="link.path" class="nav-item">
+            <i :class="link.icon" v-if="link.icon"></i>
+            <span>{{ link.name }}</span>
+          </router-link>
         </template>
       </nav>
 
-      <!-- Authentication State Control Actions -->
       <div class="navbar-right">
-        <template v-if="userRole === 'guest'">
-          <div class="log-re-btn">
-            <router-link to="/login" class="login-btn">Login</router-link>
-            <router-link to="/register" class="register-btn">Register</router-link>
-          </div>
-        </template>
-        <template v-else>
+        <template v-if="userRole !== 'guest'">
           <div class="user-menu_badge">
-            <span>{{ userData.name }} ▾</span>
+            <i class="fa-solid fa-user-circle"></i> <span>{{ userData.name }}</span>
           </div>
         </template>
       </div>
+
     </div>
   </header>
 </template>
@@ -156,27 +171,27 @@ const navLinks = computed(() => {
   display: flex;
   justify-content: center;
   align-items: center;
+  background-color: #ffffff;
 }
 
 .navbar-container {
-  width: 57%;
-  max-width: 1200px;
-  height: 65px;
+  width: 68%;
+  max-width: 1400px;
+  height: 75px;
   border: 2px solid #730b19;
-  border-radius: 20px;
+  border-radius: 10px;
   background-color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-right: 10px;
+  padding: 0 ;
   position: relative;
   direction: ltr;
 }
 
 .mobile-menu-btn {
   display: none;
-  font-size: 26px;
-  font-weight: bold;
+  font-size: 24px;
   background: none;
   border: none;
   cursor: pointer;
@@ -187,12 +202,14 @@ const navLinks = computed(() => {
 .logo-link {
   display: flex;
   align-items: center;
+  text-decoration: none;
 }
 
 .logo-img {
-  height: 74px;
-  max-width: 120px;
-  border-radius: 25px 0 0 25px;
+  height: 80px;
+    max-width: 133px;
+    object-fit: contain;
+    border-radius: 0 10px 10px 0;
 }
 
 .nav-links {
@@ -201,15 +218,29 @@ const navLinks = computed(() => {
   gap: 1.5rem;
 }
 
+/* تعديل الـ Nav Item لتكون الأيقونة فوق النص وحجم الخط 18px */
 .nav-item {
   font-weight: 700;
-  font-size: 15px;
-  color: #111111;
+  font-size: 18px;
+  color: #333333;
   text-decoration: none;
   cursor: pointer;
+  display: flex;
+  flex-direction: column; /* جعل العناصر تترتب عمودياً */
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: color 0.2s ease;
+  line-height: 1.2;
 }
 
-.nav-item:hover, .router-link-active {
+.nav-item i {
+  color: #730b19;
+  font-size: 18px; /* حجم أيقونة متناسق مع النص */
+}
+
+.nav-item:hover, 
+.router-link-active {
   color: #730b19;
 }
 
@@ -218,80 +249,105 @@ const navLinks = computed(() => {
   cursor: pointer;
 }
 
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  background: #ffffff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+.dropdown-toggle {
   display: flex;
   flex-direction: column;
-  min-width: 160px;
+  align-items: center;
+  justify-content: center;
+}
+
+.dropdown-toggle span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 135%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(115, 11, 25, 0.15);
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
   z-index: 100;
   padding: 8px 0;
 }
 
 .dropdown-item {
-  padding: 8px 16px;
-  color: #333;
+  padding: 10px 16px;
+  color: #333333;
   text-decoration: none;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.dropdown-item i {
+  color: #730b19;
+  width: 16px;
+  text-align: center;
 }
 
 .dropdown-item:hover {
-  background-color: #f5f5f5;
+  background-color: #fdf2f2;
   color: #730b19;
-}
-
-.log-re-btn {
-  display: flex;
-  align-items: center;
-}
-
-.login-btn {
-  background-color: #730b19;
-  color: #ffffff;
-  border: 1px solid #730b19;
-  border-radius: 6px 0 0 6px;
-  text-decoration: none;
-  padding: 5px 10px;
-  font-size: 13px;
-}
-
-.register-btn {
-  background-color: #ffffff;
-  color: #730b19;
-  border: 1px solid #730b19;
-  border-radius: 0 6px 6px 0;
-  text-decoration: none;
-  padding: 5px 10px;
-  font-size: 13px;
 }
 
 .user-menu_badge {
   font-weight: bold;
   color: #730b19;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
+  background-color: #fdf2f2;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(115, 11, 25, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-@media (max-width: 992px) {
-  .nav-links, .log-re-btn, .user-menu_badge {
+@media (max-width: 1100px) {
+  .nav-links {
+    gap: 1rem;
+  }
+  .nav-item {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .nav-links, 
+  .navbar-right {
     display: none; 
   }
+  
   .mobile-menu-btn {
     display: block;
   }
+  
   .navbar-container {
     width: 100%;
-    padding: 0 15px;
     border: none;
-    justify-content: space-between;
+    box-shadow: none;
+    padding: 0 10px;
   }
-  .mobile-menu-btn {
-    margin: 10px;
+  
+  .logo-img {
+    height: 48px;
   }
 }
 </style>

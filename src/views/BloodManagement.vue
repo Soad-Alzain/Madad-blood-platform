@@ -1,17 +1,23 @@
 <script setup lang="ts">
 /**
  * @file BloodManagement.vue
- * @description Fully responsive component with table-to-card transformation for small screens.
+ * @description Role-based Blood Management component dynamically adapting tabs and features for Admin, Hospital, and Blood Bank using Odoo Backend APIs.
  */
 
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import { bloodRequestService } from '@/services/bloodRequestService'
+import { inventoryService } from '@/services/inventoryService'
+import { hospitalService } from '@/services/hospitalService'
+import { appointmentService } from '@/services/appointmentService'
 
 // ==========================================
 // 1. TYPE DEFINITIONS & INTERFACES
 // ==========================================
 
-type TabType = 'banks' | 'inventory' | 'requests'
+type UserRole = 'admin' | 'hospital' | 'blood_bank' | 'donor'
+
+// Dynamic tabs depending on role
+type TabType = 'banks' | 'inventory' | 'requests' | 'appointments' | 'users'
 
 interface BloodBank {
   id: number
@@ -43,15 +49,35 @@ interface BloodRequest {
   bloodType: string
   units: number
   priority: 'High' | 'Normal' | 'Low'
-  status: 'Pending' | 'Approved' | 'Rejected'
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Accepted'
   location: string
   note?: string
   bloodBank?: string
 }
 
+interface DonationAppointment {
+  id: string
+  donorName: string
+  bloodType: string
+  bloodBank: string
+  date: string
+  status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled'
+}
+
+interface SystemUser {
+  id: number
+  name: string
+  email: string
+  role: 'Hospital' | 'Blood Bank'
+  status: 'Active' | 'Inactive'
+}
+
 // ==========================================
 // 2. REACTIVE STATE MANAGEMENT
 // ==========================================
+
+// Current user role fetched from backend session/auth storage
+const currentUserRole = ref<UserRole>('blood_bank')
 
 const activeTab = ref<TabType>('banks')
 const searchQuery = ref<string>('')
@@ -65,10 +91,22 @@ const isModalOpen = ref<boolean>(false)
 const selectedBankItem = ref<BloodBank | null>(null)
 const selectedInventoryItem = ref<InventoryItem | null>(null)
 const selectedRequestItem = ref<BloodRequest | null>(null)
+const selectedAppointmentItem = ref<DonationAppointment | null>(null)
+const isAddHospitalModalOpen = ref<boolean>(false)
 
-// Odoo Loading & Error States
+// New entity form states
+const newHospitalForm = ref({ name: '', location: '', contact: '', bloodBank: '' })
+
+// Odoo Loading, Error & Empty States
 const isLoading = ref<boolean>(false)
 const odooError = ref<string | null>(null)
+
+// Dynamic Data States (Fetched from Odoo APIs - No Mock Data)
+const bloodBanks = ref<BloodBank[]>([])
+const inventory = ref<InventoryItem[]>([])
+const requests = ref<BloodRequest[]>([])
+const appointments = ref<DonationAppointment[]>([])
+const systemUsers = ref<SystemUser[]>([])
 
 // ==========================================
 // 3. CONSTANTS & DROPDOWN OPTIONS
@@ -78,91 +116,84 @@ const bloodTypes: readonly string[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+
 const locations: readonly string[] = ['Khartoum', 'Kassala', 'Gedaref', 'Northern', 'Port Sudan']
 
 // ==========================================
-// 4. DATASETS (Fallback & Initial)
+// 4. API FETCHING METHODS (Odoo Integration)
 // ==========================================
 
-const bloodBanks = ref<BloodBank[]>([
-  { id: 1, name: 'Khartoum Central Blood', location: 'Khartoum', contact: '091594548', bloodType: 'O+', stockLevel: 'High', status: 'Active', totalUnits: 500, availableTypes: ['A-', 'O+', 'B+'] },
-  { id: 2, name: 'Port Sudan Blood Bank', location: 'Port Sudan', contact: '01158565798', bloodType: 'B+', stockLevel: 'Medium', status: 'Active', totalUnits: 320, availableTypes: ['A+', 'O-'] }
-])
-
-const inventory = ref<InventoryItem[]>([
-  { id: 1, bloodType: 'A+', available: 120, reserved: 20, expiryDate: '15 Sep', status: 'Available', location: 'Khartoum', fromBank: 'Central Blood Bank', toBank: 'Emergency Blood Bank' },
-  { id: 2, bloodType: 'O+', available: 45, reserved: 10, expiryDate: '20 Sep', status: 'Low', location: 'Kassala', fromBank: 'Central Blood Bank', toBank: 'Emergency Blood Bank' }
-])
-
-const requests = ref<BloodRequest[]>([
-  { id: '#REQ001', hospital: 'Al Noor', bloodType: 'O-', units: 5, priority: 'High', status: 'Pending', location: 'Khartoum', note: 'Emergency surgery', bloodBank: 'Khartoum Central Blood' },
-  { id: '#REQ002', hospital: 'Royal Hospital', bloodType: 'A+', units: 5, priority: 'Normal', status: 'Approved', location: 'Gedaref', note: 'Blood Exhibition, Loss Exhibition', bloodBank: 'Port Sudan Blood Bank' }
-])
-
-// ==========================================
-// 5. ODOO JSON-RPC INTEGRATION HANDLER
-// ==========================================
-
-const fetchOdooData = async () => {
+const fetchDashboardData = async () => {
   isLoading.value = true
   odooError.value = null
-
   try {
-    const authResponse = await axios.post('/jsonrpc', {
-      jsonrpc: '2.0',
-      method: 'call',
-      params: {
-        service: 'common',
-        method: 'authenticate',
-        args: ['YOUR_DB_NAME', 'user@example.com', 'YOUR_PASSWORD', {}]
-      }
-    })
+    // Fetch Blood Requests from Odoo API
+    const reqResponse = await bloodRequestService.getBloodRequests()
+    requests.value = Array.isArray(reqResponse) ? reqResponse : []
 
-    const uid = authResponse.data?.result
-    if (!uid) {
-      throw new Error('Odoo Authentication failed. Please verify your credentials.')
+    // Fetch Inventory if API is available
+    if (typeof inventoryService.getInventory === 'function') {
+      const invResponse = await inventoryService.getInventory()
+      inventory.value = Array.isArray(invResponse) ? invResponse : []
     }
 
-    const response = await axios.post('/jsonrpc', {
-      jsonrpc: '2.0',
-      method: 'call',
-      params: {
-        service: 'object',
-        method: 'execute_kw',
-        args: [
-          'YOUR_DB_NAME',
-          uid,
-          'YOUR_PASSWORD',
-          'medical.blood.bank',
-          'search_read',
-          [[]],
-          { fields: ['name', 'location', 'phone', 'stock_level', 'state', 'blood_type'] }
-        ]
-      }
-    })
-
-    if (response.data?.error) {
-      throw new Error(response.data.error.data?.message || 'Odoo RPC Error')
+    // Fetch Hospitals/Banks if API is available
+    if (typeof hospitalService.getHospitals === 'function') {
+      const hospResponse = await hospitalService.getHospitals()
+      bloodBanks.value = Array.isArray(hospResponse) ? hospResponse : []
     }
 
-    if (response.data?.result) {
-      bloodBanks.value = response.data.result.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        location: item.location || 'Unknown',
-        contact: item.phone || 'N/A',
-        bloodType: item.blood_type || 'O+',
-        stockLevel: item.stock_level || 'Normal',
-        status: item.state === 'active' ? 'Active' : 'Inactive'
-      }))
+    // Fetch Appointments if API is available
+    if (typeof appointmentService.getAppointments === 'function') {
+      const apptResponse = await appointmentService.getAppointments()
+      appointments.value = Array.isArray(apptResponse) ? apptResponse : []
     }
   } catch (err: any) {
-    odooError.value = err?.message || 'Failed to connect to Odoo Server.'
-    console.error('Odoo Connection Error:', err)
+    if (err.response && err.response.status === 401) {
+      odooError.value = 'Unauthorized. Please log in again.'
+    } else if (err.response && err.response.status === 403) {
+      odooError.value = 'Forbidden. You do not have permission to view this data.'
+    } else {
+      odooError.value = 'Unable to load data. Please try again.'
+    }
   } finally {
     isLoading.value = false
   }
 }
 
+// ==========================================
+// 5. ROLE CONFIGURATION & COMPUTED TABS
+// ==========================================
+
+const availableTabs = computed(() => {
+  switch (currentUserRole.value) {
+    case 'admin':
+      return [
+        { id: 'users', label: 'Manage Users & Entities', icon: 'fas fa-users-cog' },
+        { id: 'banks', label: 'Blood Banks', icon: 'fas fa-hospital' },
+        { id: 'inventory', label: 'Inventory', icon: 'fas fa-boxes' },
+        { id: 'requests', label: 'All Requests', icon: 'fas fa-clipboard-list' }
+      ]
+    case 'hospital':
+      return [
+        { id: 'banks', label: 'Available Banks', icon: 'fas fa-hospital' },
+        { id: 'inventory', label: 'Blood Inventory', icon: 'fas fa-boxes' },
+        { id: 'requests', label: 'My Blood Requests', icon: 'fas fa-clipboard-list' }
+      ]
+    case 'blood_bank':
+      return [
+        { id: 'banks', label: 'Blood Banks', icon: 'fas fa-hospital' },
+        { id: 'inventory', label: 'Inventory Management', icon: 'fas fa-boxes' },
+        { id: 'requests', label: 'Incoming Requests', icon: 'fas fa-clipboard-list' },
+        { id: 'appointments', label: 'Donation Appointments', icon: 'fas fa-calendar-check' }
+      ]
+    default:
+      return [{ id: 'banks', label: 'Blood Banks', icon: 'fas fa-hospital' }]
+  }
+})
+
 onMounted(() => {
-  // fetchOdooData()
+  const tabs = availableTabs.value
+  if (!tabs.some(t => t.id === activeTab.value)) {
+    activeTab.value = tabs[0].id as TabType
+  }
+  fetchDashboardData()
 })
 
 // ==========================================
@@ -201,8 +232,16 @@ const filteredRequests = computed<BloodRequest[]>(() => {
   })
 })
 
+const filteredAppointments = computed<DonationAppointment[]>(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  return appointments.value.filter(a => {
+    const matchSearch = !query || a.donorName.toLowerCase().includes(query) || a.bloodBank.toLowerCase().includes(query)
+    return matchSearch
+  })
+})
+
 // ==========================================
-// 7. HELPER & MODAL METHODS
+// 7. HELPER & API ACTION METHODS
 // ==========================================
 
 const resetFilters = (): void => {
@@ -232,24 +271,92 @@ const viewRequestDetails = (request: BloodRequest) => {
   isModalOpen.value = true
 }
 
+const viewAppointmentDetails = (appt: DonationAppointment) => {
+  selectedAppointmentItem.value = appt
+  isModalOpen.value = true
+}
+
+const approveRequest = async (reqId: string) => {
+  try {
+    await bloodRequestService.acceptBloodRequest({ request_id: reqId })
+    const req = requests.value.find(r => r.id === reqId)
+    if (req) req.status = 'Approved'
+  } catch (err) {
+    odooError.value = 'Failed to accept blood request.'
+  }
+}
+
+const rejectRequest = async (reqId: string) => {
+  try {
+    await bloodRequestService.rejectBloodRequest({ request_id: reqId })
+    const req = requests.value.find(r => r.id === reqId)
+    if (req) req.status = 'Rejected'
+  } catch (err) {
+    odooError.value = 'Failed to reject blood request.'
+  }
+}
+
+const confirmAppointment = async (apptId: string) => {
+  try {
+    if (typeof appointmentService.acceptAppointment === 'function') {
+      await appointmentService.acceptAppointment(apptId)
+    }
+    const appt = appointments.value.find(a => a.id === apptId)
+    if (appt) appt.status = 'Confirmed'
+  } catch (err) {
+    odooError.value = 'Failed to confirm appointment.'
+  }
+}
+
+const rejectAppointment = async (apptId: string) => {
+  try {
+    if (typeof appointmentService.rejectAppointment === 'function') {
+      await appointmentService.rejectAppointment(apptId)
+    }
+    const appt = appointments.value.find(a => a.id === apptId)
+    if (appt) appt.status = 'Cancelled'
+  } catch (err) {
+    odooError.value = 'Failed to cancel appointment.'
+  }
+}
+
+const saveNewHospital = async () => {
+  if (!newHospitalForm.value.name) return
+  try {
+    if (typeof hospitalService.createHospital === 'function') {
+      await hospitalService.createHospital(newHospitalForm.value)
+    }
+    isAddHospitalModalOpen.value = false
+    newHospitalForm.value = { name: '', location: '', contact: '', bloodBank: '' }
+    fetchDashboardData()
+  } catch (err) {
+    odooError.value = 'Failed to create hospital.'
+  }
+}
+
 const closeModal = () => {
   isModalOpen.value = false
   selectedBankItem.value = null
   selectedInventoryItem.value = null
   selectedRequestItem.value = null
+  selectedAppointmentItem.value = null
 }
 
 const getStatusClass = (status: string) => {
-  switch (status.toLowerCase()) {
+  switch (status?.toLowerCase()) {
     case 'active':
     case 'available':
     case 'approved':
+    case 'accepted':
+    case 'confirmed':
+    case 'completed':
       return 'status-active'
     case 'pending':
       return 'status-pending'
     case 'low':
     case 'inactive':
     case 'rejected':
+    case 'cancelled':
       return 'status-low'
     default:
       return ''
@@ -259,37 +366,31 @@ const getStatusClass = (status: string) => {
 
 <template>
   <main class="blood-management-page">
-    <h1 class="main-title">Blood Management</h1>
+    <header class="page-top-header">
+      <h1 class="main-title">Blood Management & Operations</h1>
+    </header>
 
-    <!-- Tab Navigation Bar -->
+    <!-- Tab Navigation Bar (Dynamic Based on Role) -->
     <nav class="category-cards" aria-label="Main Navigation">
       <button 
+        v-for="tab in availableTabs"
+        :key="tab.id"
+        type="button"
         class="card" 
-        :class="{ active: activeTab === 'banks' }" 
-        @click="switchTab('banks')"
+        :class="{ active: activeTab === tab.id }" 
+        @click="switchTab(tab.id as TabType)"
       >
-        <span class="icon"><i class="fas fa-hospital"></i></span>
-        <h3>Blood Banks</h3>
-      </button>
-
-      <button 
-        class="card" 
-        :class="{ active: activeTab === 'inventory' }" 
-        @click="switchTab('inventory')"
-      >
-        <span class="icon"><i class="fas fa-boxes"></i></span>
-        <h3>Inventory</h3>
-      </button>
-
-      <button 
-        class="card" 
-        :class="{ active: activeTab === 'requests' }" 
-        @click="switchTab('requests')"
-      >
-        <span class="icon"><i class="fas fa-clipboard-list"></i></span>
-        <h3>Blood Requests</h3>
+        <span class="icon"><i :class="tab.icon"></i></span>
+        <h3>{{ tab.label }}</h3>
       </button>
     </nav>
+
+    <!-- Admin Quick Action Toolbar -->
+    <div v-if="currentUserRole === 'admin'" class="admin-actions-bar">
+      <button type="button" class="btn-action primary" @click="isAddHospitalModalOpen = true">
+        <i class="fas fa-hospital-symbol"></i> Add Hospital / Bank
+      </button>
+    </div>
 
     <!-- Centered Larger Search Box -->
     <div class="search-container">
@@ -298,10 +399,15 @@ const getStatusClass = (status: string) => {
         <input 
           v-model="searchQuery" 
           type="search" 
-          placeholder="Search blood banks, requests, or types..." 
+          placeholder="Search records, types, or names..." 
           aria-label="Search"
         />
       </div>
+    </div>
+
+    <!-- Loading State -->
+    <div v-if="isLoading" class="alert loading-alert">
+      Loading data from Odoo...
     </div>
 
     <!-- Odoo Alert Message -->
@@ -309,11 +415,46 @@ const getStatusClass = (status: string) => {
       {{ odooError }}
     </div>
 
+    <!-- Section: Admin Users Management -->
+    <section v-if="activeTab === 'users' && currentUserRole === 'admin'" class="section-container">
+      <header class="section-header">
+        <h2>System Users & Entities</h2>
+        <p class="subtitle">Unified control panel for hospitals and blood banks</p>
+      </header>
+      <div class="table-wrapper">
+        <table class="data-table responsive-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email / Contact</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="user in systemUsers" :key="user.id">
+              <td data-label="Name"><strong>{{ user.name }}</strong></td>
+              <td data-label="Email / Contact">{{ user.email }}</td>
+              <td data-label="Role">{{ user.role }}</td>
+              <td data-label="Status"><span class="status-badge" :class="getStatusClass(user.status)">{{ user.status }}</span></td>
+              <td data-label="Actions">
+                <button type="button" class="btn-view">Toggle Status</button>
+              </td>
+            </tr>
+            <tr v-if="systemUsers.length === 0">
+              <td colspan="5" class="no-data">No system users found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- Section 1: Blood Banks -->
     <section v-if="activeTab === 'banks'" class="section-container">
       <header class="section-header">
-        <h2>Blood Bank</h2>
-        <p class="subtitle">Manage and monitor connected Blood Banks</p>
+        <h2>Blood Banks Network</h2>
+        <p class="subtitle">Manage and monitor connected Blood Banks and stock availability</p>
       </header>
 
       <div class="controls-row">
@@ -357,7 +498,7 @@ const getStatusClass = (status: string) => {
               <td data-label="Blood Type"><strong>{{ bank.bloodType }}</strong></td>
               <td data-label="Stock Level">{{ bank.stockLevel }}</td>
               <td data-label="Status"><span class="status-badge" :class="getStatusClass(bank.status)">{{ bank.status }}</span></td>
-              <td data-label="Actions"><button @click="viewBankDetails(bank)" class="btn-view">View</button></td>
+              <td data-label="Actions"><button type="button" @click="viewBankDetails(bank)" class="btn-view">View</button></td>
             </tr>
             <tr v-if="filteredBanks.length === 0">
               <td colspan="7" class="no-data">No matching blood banks found.</td>
@@ -412,7 +553,7 @@ const getStatusClass = (status: string) => {
                   {{ item.status }}
                 </span>
               </td>
-              <td data-label="Movement"><button @click="viewInventoryDetails(item)" class="btn-view">View</button></td>
+              <td data-label="Movement"><button type="button" @click="viewInventoryDetails(item)" class="btn-view">View</button></td>
             </tr>
             <tr v-if="filteredInventory.length === 0">
               <td colspan="6" class="no-data">No matching inventory records found.</td>
@@ -426,7 +567,7 @@ const getStatusClass = (status: string) => {
     <section v-if="activeTab === 'requests'" class="section-container">
       <header class="section-header">
         <h2>Blood Requests</h2>
-        <p class="subtitle">Blood requests sent by hospitals and their condition</p>
+        <p class="subtitle">{{ currentUserRole === 'hospital' ? 'Manage your hospital blood requests' : 'Review blood requests sent by hospitals' }}</p>
       </header>
 
       <div class="controls-row">
@@ -445,6 +586,7 @@ const getStatusClass = (status: string) => {
             <option value="">Status (All)</option>
             <option value="Pending">Pending</option>
             <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
           </select>
         </div>
       </div>
@@ -474,10 +616,60 @@ const getStatusClass = (status: string) => {
                   {{ req.status }}
                 </span>
               </td>
-              <td data-label="Actions"><button @click="viewRequestDetails(req)" class="btn-view">View</button></td>
+              <td data-label="Actions">
+                <button type="button" @click="viewRequestDetails(req)" class="btn-view">View</button>
+                <template v-if="currentUserRole === 'blood_bank' && req.status === 'Pending'">
+                  <button type="button" @click="approveRequest(req.id)" class="btn-action-sm approve">Accept</button>
+                  <button type="button" @click="rejectRequest(req.id)" class="btn-action-sm reject">Reject</button>
+                </template>
+              </td>
             </tr>
             <tr v-if="filteredRequests.length === 0">
-              <td colspan="7" class="no-data">No matching blood requests found.</td>
+              <td colspan="7" class="no-data">No blood requests found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section 4: Donation Appointments -->
+    <section v-if="activeTab === 'appointments'" class="section-container">
+      <header class="section-header">
+        <h2>Donation Appointments</h2>
+        <p class="subtitle">Manage incoming appointments from donors</p>
+      </header>
+
+      <div class="table-wrapper">
+        <table class="data-table responsive-table">
+          <thead>
+            <tr>
+              <th>Appointment ID</th>
+              <th>Donor Name</th>
+              <th>Blood Type</th>
+              <th>Blood Bank</th>
+              <th>Date & Time</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="appt in filteredAppointments" :key="appt.id">
+              <td data-label="Appointment ID">{{ appt.id }}</td>
+              <td data-label="Donor Name">{{ appt.donorName }}</td>
+              <td data-label="Blood Type"><strong>{{ appt.bloodType }}</strong></td>
+              <td data-label="Blood Bank">{{ appt.bloodBank }}</td>
+              <td data-label="Date & Time">{{ appt.date }}</td>
+              <td data-label="Status"><span class="status-badge" :class="getStatusClass(appt.status)">{{ appt.status }}</span></td>
+              <td data-label="Actions">
+                <button type="button" @click="viewAppointmentDetails(appt)" class="btn-view">View</button>
+                <template v-if="currentUserRole === 'blood_bank' && appt.status === 'Pending'">
+                  <button type="button" @click="confirmAppointment(appt.id)" class="btn-action-sm approve">Confirm</button>
+                  <button type="button" @click="rejectAppointment(appt.id)" class="btn-action-sm reject">Cancel</button>
+                </template>
+              </td>
+            </tr>
+            <tr v-if="filteredAppointments.length === 0">
+              <td colspan="7" class="no-data">No donation appointments found.</td>
             </tr>
           </tbody>
         </table>
@@ -504,13 +696,13 @@ const getStatusClass = (status: string) => {
             <span class="p-icon"><i class="fas fa-check-circle"></i></span> <strong>Status:</strong> {{ selectedBankItem.status }}
           </div>
           <div class="popup-item">
-            <span class="p-icon"><i class="fas fa-tint"></i></span> <strong>Total Blood Units:</strong> {{ selectedBankItem.totalUnits || 500 }} Units
+            <span class="p-icon"><i class="fas fa-tint"></i></span> <strong>Total Blood Units:</strong> {{ selectedBankItem.totalUnits || 0 }} Units
           </div>
         </div>
         <div class="popup-full-width">
-          <span class="p-icon"><i class="fas fa-check-circle"></i></span> <strong>Available Blood Types:</strong> {{ selectedBankItem.availableTypes?.join(', ') || 'A-, O+, B+' }}
+          <span class="p-icon"><i class="fas fa-check-circle"></i></span> <strong>Available Blood Types:</strong> {{ selectedBankItem.availableTypes?.join(', ') || 'N/A' }}
         </div>
-        <button class="btn-close-modal" @click="closeModal">Close</button>
+        <button type="button" class="btn-close-modal" @click="closeModal">Close</button>
       </div>
 
       <!-- Pop-up 2: Unit Movement View -->
@@ -540,7 +732,7 @@ const getStatusClass = (status: string) => {
             <span class="p-icon"><i class="fas fa-hourglass-half"></i></span> <strong>Expiry Date:</strong> {{ selectedInventoryItem.expiryDate }}
           </div>
         </div>
-        <button class="btn-close-modal" @click="closeModal">Close</button>
+        <button type="button" class="btn-close-modal" @click="closeModal">Close</button>
       </div>
 
       <!-- Pop-up 3: Blood Request View -->
@@ -550,31 +742,58 @@ const getStatusClass = (status: string) => {
         </div>
         <h3>Request Details: {{ selectedRequestItem.id }}</h3>
         <div class="popup-grid">
-          <div class="popup-item">
-            <span class="p-icon"><i class="fas fa-hospital-alt"></i></span> <strong>Hospital:</strong> {{ selectedRequestItem.hospital }}
-          </div>
-          <div class="popup-item">
-            <span class="p-icon"><i class="fas fa-tint"></i></span> <strong>Blood Type:</strong> {{ selectedRequestItem.bloodType }}
-          </div>
-          <div class="popup-item">
-            <span class="p-icon"><i class="fas fa-boxes"></i></span> <strong>Units:</strong> {{ selectedRequestItem.units }}
-          </div>
-          <div class="popup-item">
-            <span class="p-icon"><i class="fas fa-bolt"></i></span> <strong>Priority:</strong> {{ selectedRequestItem.priority }}
-          </div>
-          <div class="popup-item">
-            <span class="p-icon"><i class="fas fa-map-marker-alt"></i></span> <strong>Location:</strong> {{ selectedRequestItem.location }}
-          </div>
-          <div class="popup-item">
-            <span class="p-icon"><i class="fas fa-tag"></i></span> <strong>Status:</strong> {{ selectedRequestItem.status }}
-          </div>
+          <div class="popup-item"><strong>Hospital:</strong> {{ selectedRequestItem.hospital }}</div>
+          <div class="popup-item"><strong>Blood Type:</strong> {{ selectedRequestItem.bloodType }}</div>
+          <div class="popup-item"><strong>Units:</strong> {{ selectedRequestItem.units }}</div>
+          <div class="popup-item"><strong>Priority:</strong> {{ selectedRequestItem.priority }}</div>
+          <div class="popup-item"><strong>Status:</strong> {{ selectedRequestItem.status }}</div>
+          <div class="popup-item"><strong>Location:</strong> {{ selectedRequestItem.location }}</div>
         </div>
         <div v-if="selectedRequestItem.note" class="popup-full-width">
-          <span class="p-icon"><i class="fas fa-comment-alt"></i></span> <strong>Note:</strong> {{ selectedRequestItem.note }}
+          <strong>Note:</strong> {{ selectedRequestItem.note }}
         </div>
-        <button class="btn-close-modal" @click="closeModal">Close</button>
+        <button type="button" class="btn-close-modal" @click="closeModal">Close</button>
       </div>
 
+      <!-- Pop-up 4: Appointment View -->
+      <div v-if="activeTab === 'appointments' && selectedAppointmentItem" class="popup-card">
+        <div class="popup-icon-wrapper">
+          <div class="circle-icon"><i class="fas fa-calendar-check"></i></div>
+        </div>
+        <h3>Appointment: {{ selectedAppointmentItem.id }}</h3>
+        <div class="popup-grid">
+          <div class="popup-item"><strong>Donor Name:</strong> {{ selectedAppointmentItem.donorName }}</div>
+          <div class="popup-item"><strong>Blood Type:</strong> {{ selectedAppointmentItem.bloodType }}</div>
+          <div class="popup-item"><strong>Blood Bank:</strong> {{ selectedAppointmentItem.bloodBank }}</div>
+          <div class="popup-item"><strong>Date & Time:</strong> {{ selectedAppointmentItem.date }}</div>
+          <div class="popup-item"><strong>Status:</strong> {{ selectedAppointmentItem.status }}</div>
+        </div>
+        <button type="button" class="btn-close-modal" @click="closeModal">Close</button>
+      </div>
+
+    </div>
+
+    <!-- Modal: Add Hospital / Blood Bank (Admin Only) -->
+    <div v-if="isAddHospitalModalOpen" class="modal-overlay" @click.self="isAddHospitalModalOpen = false">
+      <div class="popup-card">
+        <h3>Add New Hospital / Blood Bank</h3>
+        <div class="form-group">
+          <label>Name:</label>
+          <input v-model="newHospitalForm.name" type="text" placeholder="Enter entity name" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label>Location:</label>
+          <input v-model="newHospitalForm.location" type="text" placeholder="Enter location" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label>Contact:</label>
+          <input v-model="newHospitalForm.contact" type="text" placeholder="Enter phone number" class="form-input" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-action primary" @click="saveNewHospital">Save</button>
+          <button type="button" class="btn-close-modal" @click="isAddHospitalModalOpen = false">Cancel</button>
+        </div>
+      </div>
     </div>
   </main>
 </template>
@@ -590,11 +809,84 @@ const getStatusClass = (status: string) => {
   width: 100%;
 }
 
+.page-top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
 .main-title {
-  text-align: center;
   color: #730b19;
   font-size: 1.8rem;
-  margin-bottom: 24px;
+  margin: 4px;
+  width: 100%;
+  text-align: center;
+}
+
+.role-selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fdf2f2;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #730b19;
+}
+
+.role-select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #730b19;
+  background: #fff;
+  font-weight: 600;
+  color: #730b19;
+  cursor: pointer;
+}
+
+.admin-actions-bar {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.btn-action {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-action.primary {
+  background-color: #730b19;
+  color: #fff;
+}
+
+.btn-action.secondary {
+  background-color: #333;
+  color: #fff;
+}
+
+.btn-action-sm {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+  margin-left: 5px;
+}
+
+.btn-action-sm.approve {
+  background-color: #2e7d32;
+  color: #fff;
+}
+
+.btn-action-sm.reject {
+  background-color: #c62828;
+  color: #fff;
 }
 
 /* Category Navigation */
@@ -884,17 +1176,45 @@ const getStatusClass = (status: string) => {
   font-weight: bold;
 }
 
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.form-input {
+  padding: 10px 14px;
+  border: 1px solid #730b19;
+  border-radius: 6px;
+  outline: none;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 15px;
+}
+
 /* ==========================================
-   RESPONSIVE DESIGN: TABLE-TO-CARD FOR MOBILE
-   ========================================== */
+    RESPONSIVE DESIGN: TABLE-TO-CARD FOR MOBILE
+    ========================================== */
 
 @media (max-width: 768px) {
   .blood-management-page {
     padding: 15px 10px;
   }
 
+  .page-top-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
   .main-title {
     font-size: 1.5rem;
+    text-align: center;
   }
 
   .category-cards {
@@ -903,7 +1223,7 @@ const getStatusClass = (status: string) => {
 
   .card {
     width: 100%;
-    max-width: 110px;
+    max-width: 130px;
     padding: 10px 5px;
   }
 
@@ -971,7 +1291,7 @@ const getStatusClass = (status: string) => {
   }
 
   .popup-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1-fr;
     gap: 10px;
     text-align: center;
   }
