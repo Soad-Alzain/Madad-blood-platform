@@ -50,8 +50,18 @@
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="isLoading" class="empty-state">
+      <p>Loading user records from server...</p>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="errorMessage" class="empty-state alert-error">
+      <p>{{ errorMessage }}</p>
+    </div>
+
     <!-- Data Tables Section -->
-    <div class="table-card">
+    <div v-else class="table-card">
       <!-- Hospitals Table -->
       <div v-if="activeTab === 'hospitals'">
         <table v-if="filteredHospitals.length > 0" class="data-table">
@@ -65,12 +75,12 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="hospital in paginatedHospitals" :key="hospital.id">
+            <tr v-for="hospital in paginatedHospitals" :key="hospital.hospital_id || hospital.id">
               <td><strong>{{ hospital.name }}</strong></td>
               <td>{{ hospital.email }}</td>
               <td>{{ hospital.location }}</td>
               <td>
-                <span :class="['badge', hospital.status.toLowerCase()]">
+                <span :class="['badge', (hospital.status || '').toLowerCase()]">
                   {{ hospital.status }}
                 </span>
               </td>
@@ -83,7 +93,7 @@
 
         <!-- Empty State -->
         <div v-else class="empty-state">
-          <p>No users found.</p>
+          <p>No hospitals found.</p>
         </div>
       </div>
 
@@ -101,13 +111,13 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="donor in paginatedDonors" :key="donor.id">
+            <tr v-for="donor in paginatedDonors" :key="donor.donor_id || donor.id">
               <td><strong>{{ donor.name }}</strong></td>
-              <td><span class="blood-type-tag">{{ donor.bloodType }}</span></td>
+              <td><span class="blood-type-tag">{{ donor.blood_type || donor.bloodType }}</span></td>
               <td>{{ donor.location }}</td>
-              <td>{{ donor.lastDonation }}</td>
+              <td>{{ donor.last_donation || donor.lastDonation || 'N/A' }}</td>
               <td>
-                <span :class="['badge', donor.status === 'Eligible' ? 'eligible' : 'not-eligible']">
+                <span :class="['badge', (donor.status === 'Eligible' || donor.status === 'active') ? 'eligible' : 'not-eligible']">
                   {{ donor.status }}
                 </span>
               </td>
@@ -120,7 +130,7 @@
 
         <!-- Empty State -->
         <div v-else class="empty-state">
-          <p>No users found.</p>
+          <p>No donors found.</p>
         </div>
       </div>
 
@@ -157,10 +167,11 @@
 <script>
 /**
  * @file UsersView.vue
- * @description Admin Users Management page with dynamic tab switching, search, filters, modals, and pagination.
+ * @description Admin Users Management page integrated with Odoo backend services.
  */
 import { ref, computed, onMounted, watch } from 'vue'
-import { getHospitals, getDonors } from '@/services/userService'
+import { hospitalService } from '@/services/hospitalService'
+import { donorService } from '@/services/donorService'
 import UserDetailModal from '@/components/UserDetailModal.vue'
 
 export default {
@@ -177,36 +188,54 @@ export default {
 
     const hospitals = ref([])
     const donors = ref([])
+    
+    // UI & API states
+    const isLoading = ref(false)
+    const errorMessage = ref(null)
 
     // Modal state
     const isModalOpen = ref(false)
     const modalType = ref('hospital')
     const selectedUser = ref(null)
 
-    // Load initial mock data via service functions
-    onMounted(async () => {
+    // Load data from Odoo backend services
+    const fetchUsersData = async () => {
+      isLoading.value = true
+      errorMessage.value = null
       try {
-        hospitals.value = await getHospitals()
-        donors.value = await getDonors()
+        const [hospitalsRes, donorsRes] = await Promise.all([
+          hospitalService.getHospitals(),
+          donorService.getDonors()
+        ])
+        hospitals.value = hospitalsRes || []
+        donors.value = donorsRes || []
       } catch (error) {
-        console.error('Failed to load user records', error)
+        errorMessage.value = error.response?.data?.message || 'Failed to load user records from Odoo backend.'
+      } finally {
+        isLoading.value = false
       }
+    }
+
+    onMounted(() => {
+      fetchUsersData()
     })
 
     // Reset pagination and filters when switching tabs
     watch(activeTab, () => {
       searchQuery.value = ''
       selectedFilter.value = 'All'
-      currentPage.value = '1'
       currentPage.value = 1
     })
 
     // Computed: Filtered Hospitals
     const filteredHospitals = computed(() => {
       return hospitals.value.filter(h => {
-        const matchesSearch = h.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                              h.email.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                              h.location.toLowerCase().includes(searchQuery.value.toLowerCase())
+        const name = h.name || ''
+        const email = h.email || ''
+        const location = h.location || ''
+        const matchesSearch = name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                              email.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                              location.toLowerCase().includes(searchQuery.value.toLowerCase())
         const matchesFilter = selectedFilter.value === 'All' || h.status === selectedFilter.value
         return matchesSearch && matchesFilter
       })
@@ -215,10 +244,14 @@ export default {
     // Computed: Filtered Donors
     const filteredDonors = computed(() => {
       return donors.value.filter(d => {
-        const matchesSearch = d.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                              d.email.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                              d.location.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-                              d.bloodType.toLowerCase().includes(searchQuery.value.toLowerCase())
+        const name = d.name || ''
+        const email = d.email || ''
+        const location = d.location || ''
+        const bloodType = d.blood_type || d.bloodType || ''
+        const matchesSearch = name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                              email.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                              location.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                              bloodType.toLowerCase().includes(searchQuery.value.toLowerCase())
         const matchesFilter = selectedFilter.value === 'All' || d.status === selectedFilter.value
         return matchesSearch && matchesFilter
       })
@@ -259,6 +292,8 @@ export default {
       searchQuery,
       selectedFilter,
       currentPage,
+      isLoading,
+      errorMessage,
       filteredHospitals,
       filteredDonors,
       paginatedHospitals,
@@ -470,6 +505,10 @@ export default {
   color: #6B7280;
   font-size: 1rem;
   font-weight: 500;
+}
+
+.alert-error {
+  color: #9B1C1C;
 }
 
 /* Pagination */

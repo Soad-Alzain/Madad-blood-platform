@@ -6,29 +6,40 @@
         <button class="close-icon-btn" @click="closeModal">&times;</button>
       </div>
 
-      <div class="modal-body" v-if="userData">
+      <!-- Loading State -->
+      <div v-if="isLoading" class="modal-body text-center">
+        <p>Loading details...</p>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="errorMessage" class="modal-body alert-error">
+        <p>{{ errorMessage }}</p>
+      </div>
+
+      <!-- Data Body -->
+      <div class="modal-body" v-else-if="resolvedUserData">
         <template v-if="type === 'hospital'">
-          <div class="detail-row"><strong>Hospital Name:</strong> <span>{{ userData.name }}</span></div>
-          <div class="detail-row"><strong>Email:</strong> <span>{{ userData.email }}</span></div>
-          <div class="detail-row"><strong>Phone:</strong> <span>{{ userData.phone }}</span></div>
-          <div class="detail-row"><strong>Location:</strong> <span>{{ userData.location }}</span></div>
+          <div class="detail-row"><strong>Hospital Name:</strong> <span>{{ resolvedUserData.name }}</span></div>
+          <div class="detail-row"><strong>Email:</strong> <span>{{ resolvedUserData.email }}</span></div>
+          <div class="detail-row"><strong>Phone:</strong> <span>{{ resolvedUserData.phone }}</span></div>
+          <div class="detail-row"><strong>Location:</strong> <span>{{ resolvedUserData.location }}</span></div>
           <div class="detail-row">
             <strong>Status:</strong> 
-            <span :class="['status-badge', userData.status.toLowerCase()]">{{ userData.status }}</span>
+            <span :class="['status-badge', (resolvedUserData.status || '').toLowerCase()]">{{ resolvedUserData.status }}</span>
           </div>
-          <div class="detail-row"><strong>Total Blood Requests:</strong> <span>{{ userData.totalBloodRequests }}</span></div>
+          <div class="detail-row"><strong>Total Blood Requests:</strong> <span>{{ resolvedUserData.totalBloodRequests }}</span></div>
         </template>
 
         <template v-else>
-          <div class="detail-row"><strong>Donor Name:</strong> <span>{{ userData.name }}</span></div>
-          <div class="detail-row"><strong>Blood Type:</strong> <span class="blood-badge">{{ userData.bloodType }}</span></div>
-          <div class="detail-row"><strong>Email:</strong> <span>{{ userData.email }}</span></div>
-          <div class="detail-row"><strong>Phone:</strong> <span>{{ userData.phone }}</span></div>
-          <div class="detail-row"><strong>Location:</strong> <span>{{ userData.location }}</span></div>
-          <div class="detail-row"><strong>Last Donation:</strong> <span>{{ userData.lastDonation }}</span></div>
+          <div class="detail-row"><strong>Donor Name:</strong> <span>{{ resolvedUserData.name }}</span></div>
+          <div class="detail-row"><strong>Blood Type:</strong> <span class="blood-badge">{{ resolvedUserData.bloodType }}</span></div>
+          <div class="detail-row"><strong>Email:</strong> <span>{{ resolvedUserData.email }}</span></div>
+          <div class="detail-row"><strong>Phone:</strong> <span>{{ resolvedUserData.phone }}</span></div>
+          <div class="detail-row"><strong>Location:</strong> <span>{{ resolvedUserData.location }}</span></div>
+          <div class="detail-row"><strong>Last Donation:</strong> <span>{{ resolvedUserData.lastDonation }}</span></div>
           <div class="detail-row">
             <strong>Donation Status:</strong> 
-            <span :class="['status-badge', userData.status === 'Eligible' ? 'eligible' : 'not-eligible']">{{ userData.status }}</span>
+            <span :class="['status-badge', resolvedUserData.status === 'Eligible' ? 'eligible' : 'not-eligible']">{{ resolvedUserData.status }}</span>
           </div>
         </template>
       </div>
@@ -41,9 +52,13 @@
 </template>
 
 <script>
+import { ref, watch } from 'vue'
+import { hospitalService } from '@/services/hospitalService'
+import { donorService } from '@/services/donorService'
+
 /**
  * @file UserDetailModal.vue
- * @description Dynamic modal component for viewing detailed hospital or donor records.
+ * @description Dynamic modal component for viewing detailed hospital or donor records fetched via Odoo services.
  */
 export default {
   name: 'UserDetailModal',
@@ -56,18 +71,62 @@ export default {
       type: String, // 'hospital' or 'donor'
       required: true
     },
+    // Can accept either raw object data or an ID string/number to fetch data dynamically
     userData: {
-      type: Object,
+      type: [Object, String, Number],
       default: null
     }
   },
   emits: ['close'],
   setup(props, { emit }) {
+    const resolvedUserData = ref(null)
+    const isLoading = ref(false)
+    const errorMessage = ref(null)
+
+    const fetchDetails = async () => {
+      if (!props.isOpen) return
+
+      // If userData is already a full object, use it directly
+      if (props.userData && typeof props.userData === 'object') {
+        resolvedUserData.value = props.userData
+        return
+      }
+
+      // Otherwise, if userData acts as an ID, fetch it from Odoo backend
+      if (props.userData && (typeof props.userData === 'string' || typeof props.userData === 'number')) {
+        isLoading.value = true
+        errorMessage.value = null
+        try {
+          if (props.type === 'hospital') {
+            resolvedUserData.value = await hospitalService.getHospitalDetails(props.userData)
+          } else if (props.type === 'donor') {
+            resolvedUserData.value = await donorService.getDonorDetails(props.userData)
+          }
+        } catch (err) {
+          errorMessage.value = err.response?.data?.message || 'Failed to load details from server.'
+        } finally {
+          isLoading.value = false
+        }
+      }
+    }
+
+    // Watch for modal open state or incoming data changes to trigger fetch if needed
+    watch(() => props.isOpen, (newVal) => {
+      if (newVal) {
+        fetchDetails()
+      }
+    })
+
     const closeModal = () => {
+      resolvedUserData.value = null
+      errorMessage.value = null
       emit('close')
     }
 
     return {
+      resolvedUserData,
+      isLoading,
+      errorMessage,
       closeModal
     }
   }

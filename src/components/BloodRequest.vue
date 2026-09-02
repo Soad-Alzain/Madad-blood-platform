@@ -2,13 +2,13 @@
 /**
  * @file BloodRequest.vue
  * @description Blood Request form component allowing hospitals to submit blood unit requests 
- * integrated with Odoo backend APIs. Implements form validation, loading states, 
+ * integrated with structured bloodRequestService APIs. Implements form validation, loading states, 
  * error handling, and success feedback.
  */
 
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { bloodRequestService } from '@/services/bloodRequestService'
 
 const router = useRouter()
 
@@ -18,8 +18,8 @@ const form = reactive({
   blood_type: '',
   quantity: 1,
   blood_bank: '',
-  priority: 'Normal', // UI enhancement (checked with backend if supported)
-  notes: ''           // UI enhancement
+  priority: 'Normal',
+  notes: ''
 })
 
 // UI & API States
@@ -36,7 +36,7 @@ const bloodBanks = [
 ]
 
 /**
- * Handles form submission, triggers Odoo API integration via POST request,
+ * Handles form submission, triggers Odoo API integration via bloodRequestService,
  * and manages asynchronous loading and error feedback states.
  */
 const submitBloodRequest = async () => {
@@ -45,15 +45,18 @@ const submitBloodRequest = async () => {
   successMessage.value = null
 
   try {
-    // Calling Odoo API endpoint for creating a blood request
-    const response = await axios.post('/api/blood/request', {
+    // Calling structured bloodRequestService API endpoint for creating a blood request
+    const response = await bloodRequestService.createRequest({
       hospital_id: form.hospital_id,
       blood_type: form.blood_type,
-      quantity: Number(form.quantity)
+      quantity: Number(form.quantity),
+      blood_bank: form.blood_bank,
+      priority: form.priority,
+      notes: form.notes
     })
 
-    if (response.data) {
-      successMessage.value = `Blood request successfully created! Request ID: ${response.data.request_id} (Status: ${response.data.status})`
+    if (response) {
+      successMessage.value = `Blood request successfully created! Request ID: ${response.request_id || 'N/A'} (Status: ${response.status || 'Pending'})`
       
       // Reset form fields after successful submission
       form.hospital_id = ''
@@ -64,7 +67,7 @@ const submitBloodRequest = async () => {
       form.notes = ''
     }
   } catch (err: any) {
-    errorMessage.value = err.response?.data?.message || 'Failed to submit blood request. Please check your connection and try again.'
+    errorMessage.value = err.response?.data?.message || err.message || 'Failed to submit blood request. Please check your connection and try again.'
   } finally {
     isLoading.value = false
   }
@@ -154,13 +157,14 @@ const submitBloodRequest = async () => {
     </div>
   </main>
 </template>
+
 <style>
-body{
+body {
   direction: ltr;
 }
 </style>
-<style scoped>
 
+<style scoped>
 .blood-request-page {
   width: 100%;
   padding: 2rem 1rem;

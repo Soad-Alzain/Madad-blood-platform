@@ -1,39 +1,39 @@
-// src/services/bloodRequestService.js
-
-// يمكنك استخدام Axios أو Fetch للربط مع Odoo Backend
 import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:8069' // أو رابط خادم Odoo الخاص بك
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 export const bloodRequestService = {
-  async getBloodRequests() {
-    try {
-      // استبدل المسار بالـ Endpoint الخاص بـ Odoo
-      const response = await axios.get(`${API_BASE_URL}/api/blood-requests`)
-      return response.data
-    } catch (error) {
-      console.error('Error fetching blood requests:', error)
-      throw error
-    }
+  /**
+   * @param {Object} data
+   * @param {string} data.hospital_id
+   * @param {string} data.blood_type
+   * @param {number} data.quantity
+   * @param {string} [data.blood_bank]
+   * @param {string} [data.priority]
+   * @param {string} [data.notes]
+   */
+  async createRequest(data) {
+    const response = await axios.post(`${API_BASE_URL}/blood-requests`, data)
+    return response.data
   },
 
-  async acceptBloodRequest(data) {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/api/blood-requests/accept`, data)
-      return response.data
-    } catch (error) {
-      console.error('Error accepting blood request:', error)
-      throw error
-    }
+  async getRequests() {
+    const response = await axios.get(`${API_BASE_URL}/blood-requests`)
+    return response.data
   },
 
-  async rejectBloodRequest(data) {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/api/blood-requests/reject`, data)
-      return response.data
-    } catch (error) {
-      console.error('Error rejecting blood request:', error)
-      throw error
-    }
+  async getRequestDetails(requestId) {
+    const response = await axios.post(`${API_BASE_URL}/blood-requests/details`, { request_id: requestId })
+    return response.data
+  },
+
+  async acceptRequest(requestId) {
+    const response = await axios.post(`${API_BASE_URL}/blood-requests/accept`, { request_id: requestId })
+    return response.data
+  },
+
+  async rejectRequest(requestId) {
+    const response = await axios.post(`${API_BASE_URL}/blood-requests/reject`, { request_id: requestId })
+    return response.data
   }
 }

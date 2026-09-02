@@ -1,12 +1,11 @@
 <script setup lang="ts">
 /**
  * @file DonateBlood.vue
- * @description Donor registration component adhering to software engineering best practices:
- * strict prop/state typing, reactive data management, accessibility (a11y) support, 
- * defensive fallbacks, and integration with Odoo backend donor workflows.
+ * @description Donor registration component integrated with Odoo backend donor workflows.
  */
 
 import { reactive, ref } from 'vue'
+import { donorService } from '@/services/donorService'
 
 /**
  * Strict TypeScript interface for donor registration payload.
@@ -39,8 +38,8 @@ const successMessage = ref<string | null>(null)
 const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
 /**
- * Handles form validation and simulates asynchronous API submission 
- * to the Odoo backend platform.
+ * Handles form validation and API submission to the Odoo backend platform 
+ * using the centralized donorService.
  */
 const handleDonorSubmit = async () => {
   isLoading.value = true
@@ -48,13 +47,17 @@ const handleDonorSubmit = async () => {
   successMessage.value = null
 
   try {
-    // Simulated Odoo API endpoint integration for donor registration
-    // const response = await axios.post('/api/donor/register', form)
-    
-    // Simulating network response latency
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    // Calling real Odoo API endpoint via donorService
+    const response = await donorService.createDonor({
+      name: form.name,
+      email: form.email,
+      phone: form.phone,
+      blood_type: form.bloodType,
+      city: form.city,
+      last_donation_date: form.lastDonationDate || null
+    })
 
-    successMessage.value = 'Donation registration completed successfully! Thank you for saving lives.'
+    successMessage.value = response?.message || 'Donation registration completed successfully! Thank you for saving lives.'
     
     // Reset form fields safely
     form.name = ''
@@ -64,7 +67,7 @@ const handleDonorSubmit = async () => {
     form.city = ''
     form.lastDonationDate = ''
   } catch (err: any) {
-    errorMessage.value = err.message || 'An error occurred during registration. Please try again.'
+    errorMessage.value = err.response?.data?.message || err.message || 'An error occurred during registration. Please check your connection and try again.'
   } finally {
     isLoading.value = false
   }
@@ -209,12 +212,6 @@ const handleDonorSubmit = async () => {
   margin-bottom: 2.5rem;
 }
 
-.badge-icon {
-  font-size: 2.5rem;
-  display: inline-block;
-  margin-bottom: 0.5rem;
-}
-
 .page-title {
   color: #730b19;
   font-size: 2.2rem;
@@ -327,7 +324,7 @@ const handleDonorSubmit = async () => {
 }
 
 .btn-submit:disabled {
-  background-color: #fff;
+  background-color: #ccc;
   cursor: not-allowed;
 }
 
