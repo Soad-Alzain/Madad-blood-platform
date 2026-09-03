@@ -1,1 +1,13 @@
-{ "compilerOptions": { "target": "esnext", "module": "esnext", "strict": false, "jsx": "preserve", "moduleResolution": "node", "skipLibCheck": true, "esModuleInterop": true, "allowSyntheticDefaultImports": true, "lib": ["esnext", "dom"] }, "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"], "exclude": ["node_modules"] } 
+{ 
+    "compilerOptions": { "target": "esnext",
+     "module": "esnext",
+      "strict": false, 
+      "jsx": "preserve", 
+      "moduleResolution": "node", 
+      "skipLibCheck": true,
+       "esModuleInterop": true, 
+       "allowSyntheticDefaultImports": true, 
+       "lib": ["esnext", "dom"]
+     }, 
+"include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"],
+ "exclude": ["node_modules"] } 

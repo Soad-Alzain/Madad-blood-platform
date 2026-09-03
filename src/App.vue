@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import Navbar from './components/navbar.vue'
 import Sidebar from '@/components/Sidebar.vue'
+import '@fortawesome/fontawesome-free/css/all.min.css'
 
 // حالة القائمة الجانبية للموبايل
 const isSidebarOpen = ref(false)
